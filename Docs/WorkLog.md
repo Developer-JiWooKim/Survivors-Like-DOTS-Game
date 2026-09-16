@@ -6,6 +6,32 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 **최신 기록이 위로 오도록 역순 누적한다.**
 기록 규칙은 [CLAUDE.md](../CLAUDE.md) 1장 참조.
 
+---
+
+## 📍 현재 위치 (세션 이어갈 때 여기부터)
+
+> 작업을 마칠 때마다 이 블록을 갱신한다. 아래 상세 엔트리보다 **이 블록이 먼저 최신**이어야 한다.
+
+| | |
+|---|---|
+| **마일스톤** | **M1 진행 중** (M0 완료) |
+| **최근 작업** | 적 추격 이동 (첫 병렬 잡), Unity CLI 도입, asmdef 단축 |
+| **다음 작업** | 대시 / 파편탄 중 택 1 — **아직 미정** |
+| **미해결 이슈** | [ISSUE-002](IssueLog.md#issue-002) ⚠️ (재현 안 됨), [ISSUE-005](IssueLog.md#issue-005) ⏳ (M2로 의도적 보류) |
+
+**M1 체크리스트**
+```
+✅ 플레이어 이동 (WASD, 대각선 정규화)
+✅ 적 추격 이동 (1,000, IJobEntity ScheduleParallel)
+⬜ 대시 (쿨 3초, 0.15초 무적)
+⬜ 파편탄 자동 발사 + 피격/사망
+⬜ XP 젬 + 레벨업 UI
+```
+
+**작업 재개 전 확인할 것**
+- Unity 에디터가 켜져 있으면 `bash Tools/unity-recompile.sh`, 꺼져 있으면 `bash Tools/unity-check.sh`
+- 씬/프리팹 배치는 사용자 몫. Claude 는 절차를 단계로 요청한다 (CLAUDE.md 3.4)
+
 <details>
 <summary>엔트리 템플릿 (펼치기)</summary>
 
@@ -36,6 +62,116 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 ```
 
 </details>
+
+---
+
+## 2026-09-16 — [M1] 적 추격 이동 (첫 병렬 잡) ✅
+
+**커밋** `(미커밋)` | **관련 이슈** [ISSUE-006](IssueLog.md#issue-006) [ISSUE-007](IssueLog.md#issue-007)
+
+### 한 일
+- `Enemy/EnemyMovement.cs` — 적 이동 속도 컴포넌트
+- `Enemy/EnemyAuthoring.cs` — 프리팹용 Authoring + Baker
+- `Enemy/EnemySpawner.cs` / `EnemySpawnerAuthoring.cs` — 스폰 설정
+- `Enemy/EnemySpawnSystem.cs` — 링 영역에 1회 일괄 생성
+- `Enemy/EnemyChaseSystem.cs` — **`IJobEntity` + `ScheduleParallel`** 추격. 이 프로젝트의 **첫 병렬 잡**
+- `Editor/UnlitMaterialBuilder.cs` — `BenchmarkAssetBuilder` 를 대체. Player/Enemy/Benchmark 머티리얼 생성
+- **Unity CLI 도입** — `unity-cli` / `unity-pipeline` 스킬 설치, `Tools/unity-recompile.sh` 작성
+- **asmdef 이름 단축** — `Assets.MyAssets.Scripts.*` → `Survivors.Runtime` / `Survivors.Editor`
+- 씬 배치(적 프리팹, 스포너)는 **사용자가 에디터에서 직접 수행**
+
+**검증**: 적 1000 마리가 사방에서 플레이어 추격, 카메라 추적 정상, 콘솔 클린 (사용자 확인)
+
+### 성능 측정 — M1 시점
+
+| 항목 | 값 |
+|---|---|
+| 엔티티 수 | 1,060 (적 1000 + 플레이어 + 프리팹 + 스포너 + 시스템) |
+| FPS | 427.9 |
+| 프레임 시간 | 2.34 ms |
+| 메인 스레드 | 2.72 ms |
+| 드로우콜 | 14 |
+| SetPass Calls | 10 |
+| 삼각형 | 2,760 |
+
+> **측정 환경**: 에디터 플레이 모드 / 직교 카메라 size 15 / 적 스폰 반경 12~40 / **빌드 실측 아님**
+
+**삼각형 2,760 의 해석**: 쿼드당 2 삼각형 × 2 배 제출(ISSUE-005) = 약 690 개만 실제로 그려지고 있다.
+카메라 size 15 인데 적은 반경 12~40 에 흩어져 있어 나머지는 **프러스텀 컬링**으로 빠진 것. 정상이다.
+**즉 이 수치는 "적 1000 마리를 다 그린 비용"이 아니다.** M2 벤치에서는 전부 화면에 넣어야 비교가 성립한다.
+
+### 왜 이렇게 했나
+
+**1. 분리(separation) 를 넣지 않음**
+
+- **선택**: 순수 추격만. 적들이 플레이어 위에 겹쳐 쌓이는 걸 허용
+- **선택 이유**: 이웃을 밀어내려면 주변 적을 찾아야 하고, 그러려면 공간 해시가 필요하다(기획서 8.3).
+  공간 해시는 **M2 의 핵심 작업**이라 여기서 끌어오면 M1 덩어리가 통째로 커진다.
+- **부수 효과**: 분리가 없으니 각 적이 자기 `LocalTransform` 만 건드리고 서로를 읽지 않는다.
+  덕분에 `ScheduleParallel` 이 **무조건 안전**하다. 분리를 넣는 순간 이 단순함이 깨진다 — M2 과제.
+
+**2. 적 스탯을 Blob 이 아니라 컴포넌트에 직접**
+
+- **선택**: `EnemyMovement { Speed }` 로 엔티티마다 값을 들게 함
+- **대안**: 기획서 8.4 대로 `EnemyTypeId(byte)` + Blob 스탯 테이블
+- **선택 이유**: Blob 은 **타입이 여러 개일 때** 청크 파편화를 막는 구조다. M1 은 적이 1 종뿐이라
+  구조만 복잡해진다. 적 6 종이 들어오는 M4 에서 전환한다.
+  **단일 아키타입 원칙 자체는 지금도 지켜지고 있다** — 적은 모두 같은 컴포넌트 구성이다.
+
+**3. 원본을 씬 오브젝트가 아니라 프리팹 에셋으로**
+
+- **선택 이유**: Baker 가 **프리팹 에셋**을 변환하면 그 엔티티에 `Prefab` 컴포넌트가 붙어
+  모든 쿼리에서 자동 제외된다. 씬 안의 오브젝트를 원본으로 쓰면
+  **그 원본 자체가 살아있는 적이 되어 같이 플레이어를 쫓아온다.**
+- M0 벤치마크는 씬 오브젝트를 원본으로 썼는데, 거기서는 렌더만 하므로 무해했다. 적은 다르다.
+
+**4. 링 스폰에서 `sqrt` 로 반경 분포 보정**
+
+- 반경을 균등 난수로 뽑으면 중심 쪽에 몰린다. 넓이는 반경의 제곱에 비례하기 때문이다.
+  `sqrt(random)` 을 씌워야 링 전체에 고르게 퍼진다.
+- 시드를 고정했다. 매 실행 같은 배치가 나와야 **성능 before/after 비교가 성립**한다.
+
+**5. 오버슛 방지**
+
+- 이번 프레임 이동량이 남은 거리보다 크면 플레이어를 지나쳤다가 다음 프레임에 되돌아오며 떨린다.
+  `min(speed * dt, distance)` 로 잘라냈다.
+
+**6. Unity CLI 도입 (작업 도중 결정)**
+
+- 사용자가 `Unity-Technologies/skills` 레포를 제안. 확인해보니 **`com.unity.pipeline` 이 이미 프로젝트에
+  들어 있었고 `unity` CLI 도 이미 설치돼 있었다.** 인프라가 전부 있는 상태였다.
+- **가장 큰 이득은 에디터 락 해소**. 그동안 코드 수정마다 "에디터 닫아주세요 → 검증 → 다시 열기"
+  왕복이 있었는데, `unity command recompile` 로 **켜둔 채 재컴파일**이 된다.
+- 30 여 개 스킬 중 `unity-cli` / `unity-pipeline` 만 설치. 타일맵은 우리 지형 구조(자체 `NativeArray`
+  그리드)와 안 맞고, 물리는 안 쓰기로 했고, IAP·광고·멀티플레이어는 무관하다.
+  **스킬 설명이 컨텍스트에 올라가므로 안 쓰는 걸 깔면 소음만 된다.**
+- `unity-check.sh`(배치모드 경로)는 **지우지 않았다.** 컴파일 에러가 나면 에디터가 Safe Mode 로 부팅되고
+  그러면 Pipeline 이 로드되지 않아 CLI 연결 자체가 안 된다. 그때는 배치모드가 유일한 수단이다.
+
+**7. asmdef 이름 단축 (사용자 요청)**
+
+- `Assets.MyAssets.Scripts.Runtime` → `Survivors.Runtime`
+- **네임스페이스는 폴더 경로를 유지**해서 둘을 일부러 다르게 뒀다. 목적이 다르기 때문이다.
+  - 어셈블리명: 프로젝트 전역 유일해야 하고 `.csproj` 파일명으로도 쓰임 → 짧고 고유한 게 낫다
+  - 네임스페이스: 폴더 경로를 따라야 IDE 가 위치 불일치를 검증해준다
+  - `rootNamespace` 로 연결한다
+
+### 배운 것 / 다음에 다르게 할 것
+
+- **첫 병렬 잡을 도입하는 순간 동기화 문제가 터진다** (ISSUE-006). M1 이전엔 이동이 전부 메인 스레드라
+  문제가 없었다. `ScheduleParallel` 로 바꾸는 순간, **그 컴포넌트를 메인 스레드에서 읽는 곳이 있는지**
+  같이 점검해야 한다. 이번엔 `CameraFollow` 가 걸렸다.
+- **에디터의 안전 검사가 잡아준 게 다행이었다.** 빌드에서는 예외 없이 조용한 데이터 레이스가 된다.
+  예외 6,110 건이 오히려 좋은 신호였다.
+- 응답/로그 파싱에서 **관측한 한 가지 값에만 맞춰 좁게 쓰는 실수**를 또 했다 (ISSUE-007, ISSUE-003 과 동종).
+  `completed` 만 보고 만들었다가 `up_to_date` 에 걸렸다. 열거형 파싱은 문자 클래스부터 넓게 잡는다.
+- 성능 수치를 읽을 때 **"무엇이 측정되지 않았는지"를 먼저 본다.** 삼각형 2,760 은 컬링 때문에
+  적 1000 중 690 만 그린 값이다. 이걸 "적 1000 렌더 비용"으로 기록했으면 M2 비교가 전부 틀어졌을 것이다.
+
+### 다음 작업 (M1)
+1. 대시 (쿨 3초, 0.15초 무적)
+2. 파편탄 자동 발사 + 피격/사망
+3. XP 젬 + 레벨업 UI
 
 ---
 
@@ -134,7 +270,7 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 ### 한 일
 - **DOTS 패키지 설치** (사용자 수행): `com.unity.entities` **6.6.0**, `com.unity.entities.graphics` **6.6.0**
   - 의존성 자동 해결: `collections` 6.6.0, `burst` 2.0.0
-- `Assets.MyAssets.Scripts.Runtime` asmdef 생성
+- `Survivors.Runtime` asmdef 생성
 - 벤치마크 스크립트 작성
   - `Benchmark/BenchmarkSpawner.cs` — 스폰 설정 컴포넌트
   - `Benchmark/BenchmarkSpawnerAuthoring.cs` — Authoring + Baker
@@ -223,7 +359,7 @@ M0 목표(1만 엔티티 렌더 60fps)를 **5배 이상 여유로 통과**.
 **커밋** `(미커밋)` | **관련 이슈** [ISSUE-002](IssueLog.md#issue-002)
 
 ### 한 일
-- 에디터 전용 어셈블리 생성 → `Assets/MyAssets/Scripts/Editor/Assets.MyAssets.Scripts.Editor.asmdef`
+- 에디터 전용 어셈블리 생성 → `Assets/MyAssets/Scripts/Editor/Survivors.Editor.asmdef`
 - CLI 배치모드 진입점 작성 → `Assets/MyAssets/Scripts/Editor/CI.cs` (`Assets.MyAssets.Scripts.Editor.CI.CompileCheck`)
 - 검증 스크립트 2종 작성
   - `Tools/unity-check.sh` — 컴파일 검증 (exit 0/1/2/3)
@@ -275,7 +411,7 @@ M0 목표(1만 엔티티 렌더 60fps)를 **5배 이상 여유로 통과**.
 
 ### 다음 작업 (M0)
 1. Entities / Entities.Graphics / Burst / Collections / Mathematics 패키지 설치
-2. `Assets.MyAssets.Scripts.Runtime` asmdef 생성
+2. `Survivors.Runtime` asmdef 생성
 3. SubScene + 베이킹 동작 확인
 4. 빈 씬에 엔티티 1만 개 렌더 → **첫 성능 베이스라인 측정 및 기록**
 
@@ -333,6 +469,6 @@ M0 목표(1만 엔티티 렌더 60fps)를 **5배 이상 여유로 통과**.
 
 ### 다음 작업 (M0)
 1. Entities / Entities.Graphics / Burst / Collections / Mathematics 패키지 설치
-2. asmdef 구성 (`Assets.MyAssets.Scripts.Runtime` / `...Editor`)
+2. asmdef 구성 (`Survivors.Runtime` / `Survivors.Editor`)
 3. SubScene + 베이킹 동작 확인
 4. 빈 씬에 엔티티 1만 개 렌더 → **첫 성능 베이스라인 측정 및 기록**

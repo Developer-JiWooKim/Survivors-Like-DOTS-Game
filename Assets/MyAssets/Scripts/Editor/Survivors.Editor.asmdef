@@ -1,8 +1,8 @@
 {
-    "name": "Assets.MyAssets.Scripts.Editor",
+    "name": "Survivors.Editor",
     "rootNamespace": "Assets.MyAssets.Scripts.Editor",
     "references": [
-        "Assets.MyAssets.Scripts.Runtime",
+        "Survivors.Runtime",
         "Unity.Entities",
         "Unity.Entities.Hybrid",
         "Unity.Collections",

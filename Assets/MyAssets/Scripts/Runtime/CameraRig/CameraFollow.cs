@@ -54,6 +54,12 @@ namespace Assets.MyAssets.Scripts.Runtime.CameraRig
                 return;
             }
 
+            // LocalTransform 에 쓰는 잡(EnemyChaseSystem.ChaseJob 등)이 아직 돌고 있을 수 있다.
+            // ScheduleParallel 로 띄운 잡은 비동기라, 완료를 기다리지 않고 메인 스레드에서 읽으면
+            // 안전 시스템이 InvalidOperationException 을 던진다. 빌드에서는 예외 대신
+            // 조용한 데이터 레이스가 되므로 더 나쁘다.
+            _world.EntityManager.CompleteDependencyBeforeRO<LocalTransform>();
+
             LocalTransform playerTransform = _playerQuery.GetSingleton<LocalTransform>();
             var target = new Vector3(playerTransform.Position.x, playerTransform.Position.y, _depth);
 

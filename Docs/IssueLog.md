@@ -26,6 +26,8 @@ Unity 6 DOTS 2D 뱀서라이크 — **발생한 이슈와 대응** 기록.
 | [003](#issue-003) | 2026-09-16 | M0 | 툴링 | `unity-check.sh` 가 DOTS 분석기 에러(DC0061)를 놓침 | ✅ 해결 | 2026-09-16 |
 | [004](#issue-004) | 2026-09-16 | M0 | 성능 | 드로우콜 카운터가 BRG 인스턴싱을 0 으로 보고 | ✅ 해결 | 2026-09-16 |
 | [005](#issue-005) | 2026-09-16 | M0 | 렌더링 | 지오메트리가 2배로 제출됨 (인스턴스 20004 vs 엔티티 10002) | ⏳ 진행중 | - |
+| [006](#issue-006) | 2026-09-16 | M1 | DOTS | `ChaseJob` 완료 전 메인 스레드가 `LocalTransform` 읽어 예외 6,110건 | ✅ 해결 | 2026-09-16 |
+| [007](#issue-007) | 2026-09-16 | M1 | 툴링 | `unity-recompile.sh` 가 `up_to_date` 상태를 실패로 오판 | ✅ 해결 | 2026-09-16 |
 
 > 분류: `DOTS` / `성능` / `렌더링` / `빌드` / `툴링` / `Unity` / `게임로직` / `기타`
 
@@ -361,3 +363,109 @@ URP Universal Renderer 의 **깊이 프리패스(Depth Priming / DepthNormals pr
 지금은 성능에 여유가 있어(2.94ms / 340 FPS) 문제가 되지 않는다. **M2 에서 적 1만 + 이동 + 충돌이
 얹혀 프레임이 빠듯해지면** `PC_Renderer` 의 Depth Priming 설정을 끄고 before/after 를 측정한다.
 지금 끄면 무엇 덕분에 빨라졌는지 구분이 안 되므로 미룬다.
+
+---
+
+### ISSUE-006
+
+| | |
+|---|---|
+| **발생일시** | 2026-09-16 |
+| **마일스톤** | M1 |
+| **분류** | DOTS |
+| **상태** | ✅ 해결 |
+| **해결일** | 2026-09-16 |
+| **관련 작업** | [WorkLog 2026-09-16 (M1 적 추격)](WorkLog.md) |
+
+**증상**
+
+적 1000 마리 추격이 동작은 했으나 콘솔에 예외가 **6,110 건** 쏟아졌다.
+
+```
+InvalidOperationException: The previously scheduled job ChaseJob writes to the
+ComponentTypeHandle<...LocalTransform_RW_ComponentTypeHandle>.
+You must call JobHandle.Complete() on the job ChaseJob, before you can read
+from the ComponentTypeHandle<...> safely.
+  at Unity.Entities.EntityQuery.GetSingleton[T] ()
+  at Assets.MyAssets.Scripts.Runtime.CameraRig.CameraFollow.LateUpdate ()
+     in CameraFollow.cs:57
+```
+
+**재현 조건**
+
+`EnemyChaseSystem` 이 `ScheduleParallel()` 로 잡을 띄운 상태에서 `CameraFollow.LateUpdate()` 가
+같은 프레임에 `LocalTransform` 을 읽을 때. 매 프레임 발생한다.
+
+**원인**
+
+`ChaseJob` 은 `LocalTransform` 에 **쓰는** 잡이고 `ScheduleParallel()` 은 **비동기**다.
+잡이 완료되기 전에 메인 스레드(`LateUpdate`)에서 같은 컴포넌트를 읽으면 데이터 레이스다.
+에디터는 Jobs Debugger 안전 검사가 켜져 있어 예외로 잡아줬다.
+
+**이게 "에디터에서만 나는 경고"가 아니라는 점이 중요하다.**
+빌드에서는 안전 검사가 빠져 예외 없이 **조용한 데이터 레이스**가 된다.
+카메라가 찢어진 값(쓰는 도중의 위치)을 읽어도 아무도 알려주지 않는다. 예외로 드러난 게 다행이었다.
+
+**시도한 것**
+
+| 시도 | 결과 |
+|---|---|
+| Editor.log 에서 예외 원문·스택 추출 | `CameraFollow.cs:57` 로 지점 특정 |
+| Entities 패키지에서 완료 대기 API 확인 | `EntityManager.CompleteDependencyBeforeRO<T>()` / `EntityQuery.CompleteDependency()` 존재 확인 |
+
+**해결**
+
+메인 스레드에서 읽기 전에 해당 컴포넌트에 쓰는 잡을 완료시킨다.
+
+```csharp
+_world.EntityManager.CompleteDependencyBeforeRO<LocalTransform>();
+LocalTransform playerTransform = _playerQuery.GetSingleton<LocalTransform>();
+```
+
+**재발 방지**
+
+- **메인 스레드(MonoBehaviour)에서 ECS 컴포넌트를 읽을 때는, 그 컴포넌트에 쓰는 잡을 먼저 완료시킨다.**
+  `CompleteDependencyBeforeRO<T>()` / `CompleteDependencyBeforeRW<T>()` 를 쓴다.
+- 잡을 `ScheduleParallel()` 로 바꾸는 순간, 그 컴포넌트를 메인 스레드에서 읽는 곳이 있는지 같이 점검한다.
+  M1 이전까지는 이동이 전부 메인 스레드였기 때문에 문제가 없었고, **첫 병렬 잡을 도입한 순간 터졌다.**
+- 앞으로 ECS ↔ MonoBehaviour 경계가 늘어나면 같은 문제가 반복된다.
+  경계를 늘리지 않는 것이 최선이고, 그게 플레이어를 엔티티로 둔 이유이기도 하다.
+
+---
+
+### ISSUE-007
+
+| | |
+|---|---|
+| **발생일시** | 2026-09-16 |
+| **마일스톤** | M1 |
+| **분류** | 툴링 |
+| **상태** | ✅ 해결 |
+| **해결일** | 2026-09-16 |
+| **관련 작업** | [WorkLog 2026-09-16 (M1 적 추격)](WorkLog.md) |
+
+**증상**
+
+새로 만든 `Tools/unity-recompile.sh` 가 정상 컴파일 상태인데도 실패로 판정했다.
+
+```
+[!] recompile_status 를 읽지 못했습니다.
+"result": "{\"status\":\"up_to_date\",\"failed\":false,\"errors\":[],\"compilationFailed\":false}"
+```
+
+**원인**
+
+두 가지가 겹쳤다.
+
+1. 상태 파싱 정규식이 `"status":"[a-zA-Z]+"` 라 **언더스코어가 들어간 `up_to_date` 를 못 잡았다.**
+2. 허용 상태 목록에 `up_to_date` 가 없었다. 이건 "바뀐 게 없어 재컴파일이 불필요했다"는 뜻이라 성공 상태다.
+
+**해결**
+
+문자 클래스에 `_` 를 추가하고 `up_to_date` 를 성공 상태로 취급.
+
+**재발 방지**
+
+- **API 응답의 상태값 목록을 추측하지 않는다.** `completed` 하나만 보고 만들었다가 `up_to_date` 에 걸렸다.
+- 열거형 값을 파싱할 때 문자 클래스를 `[a-zA-Z]` 로 좁히지 않는다. 언더스코어·하이픈이 흔하다.
+- ISSUE-003 과 **같은 종류의 실수**다. 로그/응답 파싱에서 관측한 한 가지 형식에 맞춰 좁게 쓴 것.

@@ -1,0 +1,72 @@
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+namespace Assets.MyAssets.Scripts.Editor
+{
+    /// <summary>
+    /// 도형 프로토타입용 URP Unlit 머티리얼을 코드로 생성한다.
+    ///
+    /// 왜 코드로 만드나 (CLAUDE.md 3.4):
+    /// 머티리얼은 눈으로 조정할 게 색 정도뿐인 반면, **어떤 셰이더에 GPU Instancing 을 켰는지**가
+    /// 성능을 좌우한다. 코드로 두면 그 설정이 명시적으로 남고 재현 가능하다.
+    /// 씬 안의 오브젝트 배치는 반대 이유로 사용자가 에디터에서 직접 한다.
+    /// </summary>
+    public static class UnlitMaterialBuilder
+    {
+        private const string MaterialDir = "Assets/MyAssets/Materials";
+
+        /// <summary>
+        /// 2D 게임이지만 URP "2D Renderer" 가 아니라 Universal Renderer 를 쓴다.
+        /// 2D Renderer 의 스프라이트 셰이더는 DOTS 인스턴싱(DOTS_INSTANCING_ON) 변형을
+        /// 지원하지 않아 대량 엔티티를 드로우콜 몇 개로 묶을 수 없기 때문이다.
+        /// </summary>
+        private const string ShaderName = "Universal Render Pipeline/Unlit";
+
+        [MenuItem("Tools/도형 머티리얼 생성")]
+        public static void CreateAll()
+        {
+            Create("PlayerQuad", new Color(0.95f, 0.95f, 0.95f, 1f));
+            Create("EnemyQuad", new Color(0.85f, 0.25f, 0.25f, 1f));
+            Create("BenchmarkQuad", new Color(0.85f, 0.25f, 0.25f, 1f));
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        private static void Create(string materialName, Color color)
+        {
+            Shader shader = Shader.Find(ShaderName);
+            if (shader == null)
+            {
+                throw new FileNotFoundException($"셰이더를 찾지 못했습니다: {ShaderName}. URP 패키지를 확인하세요.");
+            }
+
+            if (!Directory.Exists(MaterialDir))
+            {
+                Directory.CreateDirectory(MaterialDir);
+                AssetDatabase.Refresh();
+            }
+
+            string path = $"{MaterialDir}/{materialName}.mat";
+
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            else
+            {
+                material.shader = shader;
+            }
+
+            // 이게 꺼져 있으면 엔티티 1만 개가 드로우콜 1만 개가 된다.
+            material.enableInstancing = true;
+            material.SetColor("_BaseColor", color);
+
+            EditorUtility.SetDirty(material);
+            Debug.Log($"[UnlitMaterialBuilder] {path} 생성/갱신 (GPU Instancing: {material.enableInstancing})");
+        }
+    }
+}

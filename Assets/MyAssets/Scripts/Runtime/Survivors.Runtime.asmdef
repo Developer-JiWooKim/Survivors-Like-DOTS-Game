@@ -1,5 +1,5 @@
 {
-    "name": "Assets.MyAssets.Scripts.Runtime",
+    "name": "Survivors.Runtime",
     "rootNamespace": "Assets.MyAssets.Scripts.Runtime",
     "references": [
         "Unity.Entities",

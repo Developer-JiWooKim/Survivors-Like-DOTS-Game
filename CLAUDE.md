@@ -6,9 +6,27 @@ Unity 6 DOTS 기반 2D 뱀서라이크. 기획서는 [Docs/GameDesign.md](Docs/G
 | | |
 |---|---|
 | Unity | 6000.6.0f1 |
-| 렌더 | URP 17.6 (2D) |
-| 핵심 스택 | Entities / Burst / Jobs / Collections (※ 아직 미설치, M0에서 설치) |
+| 렌더 | URP 17.6 / **Universal Renderer** (2D Renderer 아님 — BRG 인스턴싱 때문) |
+| 핵심 스택 | Entities 6.6.0 / Entities.Graphics 6.6.0 / Burst 2.0.0 / Collections 6.6.0 |
 | 스크립트 루트 | `Assets/MyAssets/Scripts/` |
+
+---
+
+## 0. 세션 시작 시 (필수)
+
+**새 세션에서 작업을 이어갈 때는 코드를 건드리기 전에 아래를 먼저 읽는다.**
+이 파일만 자동으로 로드되고 나머지는 읽지 않으면 모르는 상태다.
+
+```bash
+sed -n '1,120p' Docs/WorkLog.md      # 최상단 = 가장 최근 작업. 현재 위치와 다음 작업이 여기 있다
+sed -n '1,40p'  Docs/IssueLog.md     # 이슈 목록 표. ⏳진행중 / ⚠️미해결 / 🔄우회 를 확인
+git log --oneline -10                # 마지막 커밋 이후 무엇이 바뀌었는지
+```
+
+기획서가 필요하면 [Docs/GameDesign.md](Docs/GameDesign.md), 환경 설정은 [Docs/Setup.md](Docs/Setup.md).
+
+읽고 나면 **현재 마일스톤 / 직전 작업 / 다음 작업 / 미해결 이슈**를 짧게 요약해 확인받고 시작한다.
+사용자가 "다음 작업 시작해" 라고만 말해도 이 절차를 거친다.
 
 ---
 
@@ -34,6 +52,8 @@ Unity 6 DOTS 기반 2D 뱀서라이크. 기획서는 [Docs/GameDesign.md](Docs/G
 4. **성능 수치** — 측정했다면 before·after, 엔티티 수, ms, FPS, 측정 환경
 5. **배운 것 / 다음에 다르게 할 것**
 6. **커밋 해시** — 나중에 코드와 기록을 대조할 수 있도록
+
+**작업을 마칠 때는 WorkLog 상단의 `📍 현재 위치` 블록도 반드시 갱신한다.** 다음 세션이 이걸 먼저 읽는다.
 
 ### 1.2 IssueLog — 이슈와 대응
 
@@ -83,21 +103,44 @@ Unity 6 DOTS 기반 2D 뱀서라이크. 기획서는 [Docs/GameDesign.md](Docs/G
 
 Claude는 Unity 배치모드 CLI로 **컴파일과 테스트를 직접 검증한다.** 사용자에게 떠넘기지 않는다.
 
-```bash
-bash Tools/unity-check.sh              # 컴파일 검증
-bash Tools/unity-test.sh EditMode      # 테스트 실행
-```
+검증 경로가 **두 개**다. 에디터가 켜져 있는지에 따라 고른다.
 
-- 진입점: `Assets/MyAssets/Scripts/Editor/CI.cs` (`Assets.MyAssets.Scripts.Editor.CI.CompileCheck`)
+| 스크립트 | 에디터 | 속도 | 언제 |
+|---|---|---|---|
+| `bash Tools/unity-recompile.sh` | **켜져 있어야 함** | 빠름 | **기본값.** 컴파일 검증 |
+| `bash Tools/unity-check.sh` | **닫혀 있어야 함** | 느림 | 위가 안 될 때 |
+| `bash Tools/unity-test.sh EditMode` | 닫혀 있어야 함 | 느림 | 테스트 실행 |
+
+- `unity-recompile.sh` 는 `com.unity.pipeline` 을 통해 **실행 중인 에디터에 재컴파일을 명령**한다. 에디터를 닫으라고 요청할 필요가 없다.
+- `unity-check.sh` 진입점: `Assets/MyAssets/Scripts/Editor/CI.cs`
 - 로그·결과: `Logs/` (gitignore 처리됨)
+- 관련 스킬: `.claude/skills/unity-cli`, `.claude/skills/unity-pipeline`
 
 ### 3.1 반드시 지킬 것
 
-- **C# 코드를 작성·수정한 뒤에는 `unity-check.sh` 를 돌린다.** 돌리기 전에 "컴파일된다"고 말하지 않는다.
-- **에디터 락**: Unity는 한 프로젝트를 두 인스턴스가 열 수 없다. 에디터가 켜져 있으면 CLI가 실패한다(스크립트가 exit 2로 먼저 걸러줌). 이때는 **사용자에게 에디터를 닫아달라고 요청**한다. 임의로 프로세스를 죽이지 않는다.
-- 최초 실행이나 패키지 설치 직후에는 임포트 때문에 수 분 걸릴 수 있다. 백그라운드로 돌린다.
+- **C# 코드를 작성·수정한 뒤에는 반드시 컴파일을 검증한다.** 돌리기 전에 "컴파일된다"고 말하지 않는다.
+- **먼저 `unity-recompile.sh` 를 시도한다.** 에디터가 켜져 있으면 그대로 통과한다.
+- **`unity-recompile.sh` 가 exit 3 (에디터 미연결)이면** 두 가지 경우다:
+  1. 에디터가 꺼져 있다 → `unity-check.sh` 를 쓴다.
+  2. **에디터가 컴파일 에러로 Safe Mode 에 들어갔다** → Pipeline 이 로드되지 않아 연결 자체가 안 된다.
+     이때도 `unity-check.sh` 로 원인을 찾는다. **두 경로를 모두 유지하는 이유가 이것이다.**
+- `unity-check.sh` 는 에디터 락 때문에 에디터가 켜져 있으면 exit 2 로 중단된다.
+  이때 **임의로 Unity 프로세스를 죽이지 않는다.** 사용자에게 닫아달라고 요청한다.
+- 최초 실행이나 패키지 설치 직후에는 임포트 때문에 수 분 걸릴 수 있다.
 
-### 3.2 CLI로 검증되지 않는 것 (사용자 확인 필요)
+### 3.2 런타임 예외는 로그에서 확인한다
+
+컴파일이 통과해도 플레이 중 예외가 날 수 있다. 사용자가 "콘솔에 에러가 난다"고 하면 에디터 로그를 직접 읽는다.
+
+```bash
+L="/c/Users/Admin/AppData/Local/Unity/Editor/Editor.log"
+grep -c "Exception" "$L"                      # 건수
+grep -a "Exception" "$L" | sort -u | head     # 종류
+```
+
+스택 트레이스에서 **우리 코드의 파일:줄**을 찾는 게 핵심이다. 패키지 내부 프레임은 대부분 무시해도 된다.
+
+### 3.3 CLI로 검증되지 않는 것 (사용자 확인 필요)
 
 | 영역 | 이유 |
 |---|---|
@@ -107,7 +150,7 @@ bash Tools/unity-test.sh EditMode      # 테스트 실행
 
 **M2 목표("적 1만 인스턴싱 렌더 60fps")의 렌더 쪽 절반은 CLI로 검증 불가**다. 사용자 실측이 필요하다.
 
-### 3.3 씬은 사용자가, 에셋은 Claude가
+### 3.4 씬은 사용자가, 에셋은 Claude가
 
 | 대상 | 누가 |
 |---|---|
@@ -141,12 +184,17 @@ bash Tools/unity-test.sh EditMode      # 테스트 실행
 
 - DOTS 시스템은 `ISystem` + `[BurstCompile]` 기본. managed 타입이 꼭 필요할 때만 `SystemBase`.
 - **asmdef 를 사용한다.** 컴파일 시간과 Burst 설정 제어를 위해 필수.
-  **어셈블리 이름도 네임스페이스와 동일하게 폴더 경로를 따른다.** 파일명도 어셈블리명과 일치시킨다.
-  | asmdef | 위치 | 상태 |
-  |---|---|---|
-  | `Assets.MyAssets.Scripts.Editor` | `Scripts/Editor/` | 생성 완료 (CLI 진입점) |
-  | `Assets.MyAssets.Scripts.Runtime` | `Scripts/Runtime/` | M0에서 생성 예정 |
-  | `Assets.MyAssets.Scripts.Tests` | `Scripts/Tests/` | 필요 시점에 생성 |
+  **어셈블리 이름은 `Survivors.*` 로 짧게 간다.** 파일명은 어셈블리명과 일치시킨다.
+  | asmdef (= 파일명) | 위치 | `rootNamespace` | 상태 |
+  |---|---|---|---|
+  | `Survivors.Editor` | `Scripts/Editor/` | `Assets.MyAssets.Scripts.Editor` | 생성 완료 (CLI 진입점) |
+  | `Survivors.Runtime` | `Scripts/Runtime/` | `Assets.MyAssets.Scripts.Runtime` | 생성 완료 |
+  | `Survivors.Tests` | `Scripts/Tests/` | `Assets.MyAssets.Scripts.Tests` | 필요 시점에 생성 |
+
+  **어셈블리명과 네임스페이스는 일부러 다르다.**
+  - 어셈블리명은 **프로젝트 전역에서 유일해야 하고** `.csproj` 파일명으로도 쓰인다. 짧고 고유한 게 낫다.
+  - 네임스페이스는 폴더 경로를 따라야 IDE 가 위치를 검증해준다.
+  - 둘의 목적이 달라서 억지로 맞출 이유가 없다. `rootNamespace` 로 연결한다.
 - **테스트는 핵심 로직만.** 틀리면 디버깅이 지옥인 것에 한정한다: 공간 해시 조회 정확성, 지형 연소 확산 규칙, 데미지 집계. 나머지는 테스트하지 않는다 — 유지비가 개발 속도를 잡아먹는다.
 - **네임스페이스는 폴더 경로를 그대로 따른다.** `Assets/` 부터 시작한다.
   | 파일 | 네임스페이스 |

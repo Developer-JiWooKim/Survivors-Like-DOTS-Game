@@ -89,7 +89,46 @@ code --install-extension visualstudiotoolsforunity.vstuc \
 
 ---
 
-## 4. CLI 검증 스크립트
+## 4. Unity CLI (`unity` 명령)
+
+프로젝트에 `com.unity.pipeline` 패키지가 들어 있어, `unity` CLI 로 **실행 중인 에디터를 직접 조종**할 수 있다. 에디터를 닫지 않고도 재컴파일·테스트가 가능해진다.
+
+### 4.1 설치
+
+```bash
+which unity && unity --version     # 이미 있는지 먼저 확인
+```
+
+없으면 (Windows PowerShell):
+
+```powershell
+$env:UNITY_CLI_CHANNEL='beta'; irm https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1 | iex
+```
+
+설치 후 새 셸을 열어야 PATH 에 잡힌다.
+
+### 4.2 에이전트 스킬
+
+`.claude/skills/unity-cli` 와 `.claude/skills/unity-pipeline` 은 **git 에 포함되어 있어 클론하면 따라온다.** 다시 설치할 필요 없다.
+
+직접 갱신하려면:
+
+```bash
+unity skill install claude-code --local --yes
+```
+
+### 4.3 확인
+
+```bash
+unity status --json        # 에디터를 켠 상태에서 state "ready" 가 보여야 한다
+unity list                 # 에디터가 노출하는 명령 목록
+```
+
+> **주의**: C# 컴파일 에러가 있으면 에디터가 **Safe Mode** 로 부팅되고, 그 상태에서는 Pipeline 패키지가 로드되지 않아 `unity status` / `unity command` 가 아예 연결되지 않는다. 그럴 때는 아래 5장의 `Tools/unity-check.sh`(에디터를 닫고 도는 경로)로 원인을 찾는다. **두 경로를 모두 갖고 있는 이유가 이것이다.**
+
+---
+
+## 5. CLI 검증 스크립트 (에디터를 닫고 도는 경로)
 
 **경로 설정은 필요 없다.** `Tools/_common.sh` 가 자동으로 탐지한다.
 
@@ -114,7 +153,7 @@ UNITY_PATH='/d/Unity/Hub/Editor/6000.6.0f1/Editor/Unity.exe' bash Tools/unity-ch
 
 ---
 
-## 5. 동작 확인
+## 6. 동작 확인
 
 여기까지 하고 나면 아래가 전부 성공해야 한다.
 
@@ -132,7 +171,7 @@ bash Tools/unity-test.sh EditMode
 
 ---
 
-## 6. 알려진 현상 / 트러블슈팅
+## 7. 알려진 현상 / 트러블슈팅
 
 ### `.slnx` 파일이 계속 수정됨으로 잡힌다
 Unity가 패키지 설치·스크립트 변경 때마다 자동 재생성하는 파일이다. `.gitignore` 는 `*.sln` 만 무시하고 `*.slnx` 는 포함하지 않아 추적된다. **의도된 상태이며 무시해도 된다.** (커밋에서 빼고 싶으면 `git restore <file>`)
@@ -159,20 +198,22 @@ tasklist | grep -i "^Unity.exe"
 참고로 락 검사는 **다른 프로젝트를 열어둔 Unity도 걸러낸다.** 오탐이지만, 잘못 실행해서 프로젝트가 깨지는 것보다 안전한 쪽을 택했다.
 
 ### `Unity ...을 찾지 못했습니다` 가 뜬다
-`ProjectVersion.txt` 의 버전과 실제 설치된 버전이 다른 경우가 대부분이다. 에러 메시지에 **설치된 버전 목록이 함께 출력**되므로 대조해서 Unity Hub에서 맞는 버전을 설치한다. 특이한 위치에 설치했다면 `UNITY_PATH` 로 지정한다 (4장 참조).
+`ProjectVersion.txt` 의 버전과 실제 설치된 버전이 다른 경우가 대부분이다. 에러 메시지에 **설치된 버전 목록이 함께 출력**되므로 대조해서 Unity Hub에서 맞는 버전을 설치한다. 특이한 위치에 설치했다면 `UNITY_PATH` 로 지정한다 (5장 참조).
 
 ---
 
-## 7. 현재 프로젝트 상태
+## 8. 현재 프로젝트 상태
 
 | | |
 |---|---|
-| 마일스톤 | **M0 진행 중** (환경 구축) |
-| 설치된 주요 패키지 | URP 17.6, Input System 1.20, Test Framework 1.8 |
-| **미설치** | **Entities / Entities.Graphics / Burst / Collections** — M0에서 설치 예정 |
-| asmdef | `Assets.MyAssets.Scripts.Editor` (에디터 전용) 만 존재. `...Runtime` 은 M0에서 생성 |
+| 마일스톤 | **M0 완료 / M1 진행 중** |
+| DOTS | Entities **6.6.0**, Entities.Graphics **6.6.0**, Collections 6.6.0, Burst 2.0.0 |
+| 기타 패키지 | URP 17.6, Input System 1.20, Pipeline 0.7.0-exp.1, Test Framework 1.8 |
+| asmdef | `Survivors.Editor`, `Survivors.Runtime` (네임스페이스는 폴더 경로 유지) |
+| 렌더 | URP **Universal Renderer** (2D Renderer 아님 — BRG 인스턴싱 때문) |
+| M0 베이스라인 | 엔티티 10,006 / 드로우콜 16 / 2.94ms (에디터 플레이 모드) |
 
-DOTS 패키지가 설치되면 `Packages/manifest.json` 변경이 git으로 전파되므로, 다른 컴퓨터에서는 `git pull` 후 Unity를 열면 자동 복원된다.
+패키지는 `Packages/manifest.json` 으로 git 전파되므로, 다른 컴퓨터에서는 `git pull` 후 Unity를 열면 자동 복원된다.
 
 ---
 

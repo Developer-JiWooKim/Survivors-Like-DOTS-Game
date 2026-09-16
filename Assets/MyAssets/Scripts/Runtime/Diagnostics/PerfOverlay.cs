@@ -10,7 +10,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
     /// 화면 구석에 성능 수치를 상시 표시한다.
     ///
     /// 왜 필요한가:
-    /// CLI 배치모드는 -nographics 라 렌더 비용을 측정할 수 없다(CLAUDE.md 3.2).
+    /// CLI 배치모드는 -nographics 라 렌더 비용을 측정할 수 없다(CLAUDE.md 3.3).
     /// 렌더 관련 수치는 사람이 직접 봐야 하므로, Profiler 창을 열지 않아도
     /// 플레이 즉시 보이고 빌드에서도 그대로 동작하는 오버레이를 둔다.
     ///
