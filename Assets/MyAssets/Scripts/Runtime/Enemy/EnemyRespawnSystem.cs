@@ -1,6 +1,7 @@
 using Assets.MyAssets.Scripts.Runtime.Combat;
 using Assets.MyAssets.Scripts.Runtime.Player;
 using Assets.MyAssets.Scripts.Runtime.Pooling;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -18,7 +19,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     /// 시간에 따라 되살리는 양을 조절하는 예산 스폰 디렉터(기획서 6.2)가 M2 이후 이 자리를 대신한다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateBefore(typeof(PlayerMoveSystem))]
     public partial struct EnemyRespawnSystem : ISystem
     {

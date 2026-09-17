@@ -1,3 +1,4 @@
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -11,7 +12,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Combat
     /// 플레이어 피해 등 대상별 사망 규칙을 따로 붙일 수 있다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(Weapon.ProjectileHitSystem))]
     public partial struct DamageApplySystem : ISystem
     {

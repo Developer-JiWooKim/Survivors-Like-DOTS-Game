@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &526493748
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -199,6 +199,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assets.MyAssets.Scripts.Runtime::Assets.MyAssets.Scripts.Runtime.Player.PlayerAuthoring
   _speed: 5
+  _maxHealth: 100
+  _hitRadius: 0.4
 --- !u!23 &1339508079
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -363,11 +365,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assets.MyAssets.Scripts.Runtime::Assets.MyAssets.Scripts.Runtime.Enemy.EnemySpawnerAuthoring
   _enemyPrefab: {fileID: 9037194797816794288, guid: 162ff87e591df6f43805e974ef2122c6, type: 3}
-  _count: 1000
+  _count: 500
   _minRadius: 12
   _maxRadius: 40
   _respawnMinRadius: 32
   _respawnMaxRadius: 36
+  _separationStrength: 1.5
+  _separationMaxNeighbors: 16
   _randomSeed: 1
 --- !u!4 &2022779165
 Transform:

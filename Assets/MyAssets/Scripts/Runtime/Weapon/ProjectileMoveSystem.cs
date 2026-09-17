@@ -1,4 +1,5 @@
 using Assets.MyAssets.Scripts.Runtime.Pooling;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Rendering;
@@ -10,7 +11,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
     /// 살아있는 투사체를 직선으로 움직이고, 수명이 다하면 풀로 돌려보낸다 (기획서 8.2 의 11번).
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(ShardFireSystem))]
     public partial struct ProjectileMoveSystem : ISystem
     {

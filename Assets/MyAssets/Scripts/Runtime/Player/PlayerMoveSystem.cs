@@ -1,4 +1,5 @@
 using Assets.MyAssets.Scripts.Runtime.Input;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -10,7 +11,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Player
     /// 입력에 따라 플레이어를 이동시킨다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     public partial struct PlayerMoveSystem : ISystem
     {
         [BurstCompile]

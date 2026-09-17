@@ -1,5 +1,6 @@
 using Assets.MyAssets.Scripts.Runtime.Enemy;
 using Assets.MyAssets.Scripts.Runtime.Pooling;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -19,7 +20,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
     /// 최근접 탐색은 전수 비교 O(N) 이다. 공간 해시(M2)가 들어오면 이 조회만 교체한다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(EnemyChaseSystem))]
     public partial struct ShardFireSystem : ISystem
     {

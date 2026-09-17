@@ -19,6 +19,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         [Tooltip("충돌 판정 반경 (월드 유닛). 기획서 8.3 기본값 0.25")]
         [SerializeField] private float _hitRadius = 0.25f;
 
+        [Tooltip("플레이어와 겹쳐 있는 동안 초당 입히는 피해. 기획서에 없는 M1 임시값")]
+        [SerializeField] private float _contactDamagePerSecond = 10f;
+
         private sealed class EnemyBaker : Baker<EnemyAuthoring>
         {
             public override void Bake(EnemyAuthoring authoring)
@@ -37,6 +40,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                 });
 
                 AddComponent(entity, new HitRadius { Value = authoring._hitRadius });
+                AddComponent(entity, new ContactDamage { PerSecond = authoring._contactDamagePerSecond });
 
                 // 켜진 채로 베이킹한다. 인스턴스는 이 상태를 물려받으므로 최초 스폰분은 바로 살아있다.
                 AddComponent<Active>(entity);

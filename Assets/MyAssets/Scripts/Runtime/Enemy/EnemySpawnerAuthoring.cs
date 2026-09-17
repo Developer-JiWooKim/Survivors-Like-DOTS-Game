@@ -26,6 +26,14 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         [Tooltip("재스폰 링의 바깥 반경 (플레이어 기준).")]
         [SerializeField] private float _respawnMaxRadius = 36f;
 
+        [Header("분리 (적끼리 겹치지 않기)")]
+        [Tooltip("추격 방향 대비 밀어내는 힘의 배율. 클수록 덜 뭉치지만 플레이어에게 덜 다가간다")]
+        [SerializeField] private float _separationStrength = 1.5f;
+
+        [Tooltip("한 적이 검사하는 이웃 수 상한. 밀집 구간의 최악 비용을 자른다")]
+        [SerializeField] private int _separationMaxNeighbors = 16;
+
+        [Header("기타")]
         [Tooltip("난수 시드. 고정하면 매 실행 같은 배치가 나와 성능 비교가 가능하다.")]
         [SerializeField] private uint _randomSeed = 1;
 
@@ -50,6 +58,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                     RespawnMinRadius = authoring._respawnMinRadius,
                     RespawnMaxRadius = authoring._respawnMaxRadius,
                     RandomSeed = authoring._randomSeed == 0 ? 1u : authoring._randomSeed,
+                });
+
+                // 적 관련 전역 설정이라 스포너에 함께 둔다. 씬 오브젝트를 하나 더 만들 필요가 없다.
+                AddComponent(entity, new EnemySeparation
+                {
+                    Strength = authoring._separationStrength,
+                    MaxNeighbors = authoring._separationMaxNeighbors,
                 });
             }
         }

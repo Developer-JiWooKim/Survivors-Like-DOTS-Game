@@ -1,6 +1,7 @@
 using Assets.MyAssets.Scripts.Runtime.Combat;
 using Assets.MyAssets.Scripts.Runtime.Enemy;
 using Assets.MyAssets.Scripts.Runtime.Pooling;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -23,7 +24,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
     /// 관통은 없다 — 처음 겹친 적 하나만 맞히고 풀로 돌아간다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(ProjectileMoveSystem))]
     public partial struct ProjectileHitSystem : ISystem
     {

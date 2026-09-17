@@ -105,4 +105,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assets.MyAssets.Scripts.Runtime::Assets.MyAssets.Scripts.Runtime.Enemy.EnemyAuthoring
   _speed: 2.5
   _maxHealth: 10
-  _hitRadius: 0.5
+  _hitRadius: 0.25

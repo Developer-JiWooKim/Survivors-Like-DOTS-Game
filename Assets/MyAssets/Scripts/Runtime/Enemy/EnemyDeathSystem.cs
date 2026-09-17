@@ -1,5 +1,6 @@
 using Assets.MyAssets.Scripts.Runtime.Combat;
 using Assets.MyAssets.Scripts.Runtime.Pooling;
+using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Rendering;
@@ -11,7 +12,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     /// XP 젬 드랍은 다음 작업에서 여기에 붙는다.
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(DamageApplySystem))]
     public partial struct EnemyDeathSystem : ISystem
     {
