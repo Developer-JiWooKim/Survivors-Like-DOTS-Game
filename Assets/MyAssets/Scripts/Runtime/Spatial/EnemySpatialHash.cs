@@ -22,6 +22,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Spatial
         /// <summary>셀 한 변 (월드 유닛). 기획서 8.3 — 적 반경 0.25 의 4 배.</summary>
         public const float CellSize = 1f;
 
+        /// <summary>
+        /// 해시에 들어가는 적 반경의 상한. 조회 쪽이 "몇 칸까지 봐야 하나" 를 정하는 데 쓴다.
+        /// 적은 **중심 좌표의 셀**에만 들어가므로, 반경이 큰 적은 옆 칸에서도 닿을 수 있기 때문이다.
+        /// 현재 적 반경 0.25 의 2 배로 여유를 뒀다. 큰 적(엘리트·보스)이 들어오는 M4 에서 Blob 스탯의 최대치로 바꾼다.
+        /// </summary>
+        public const float MaxAgentRadius = 0.5f;
+
+        /// <summary>반경 <paramref name="queryRadius"/> 인 원과 겹칠 수 있는 적을 모두 찾으려면 중심 셀에서 몇 칸까지 봐야 하는지.</summary>
+        public static int CellRangeFor(float queryRadius)
+        {
+            return (int)math.ceil((queryRadius + MaxAgentRadius) / CellSize);
+        }
+
         public NativeParallelMultiHashMap<int, AgentRef> Map;
         public JobHandle BuildHandle;
         public JobHandle ReadersHandle;

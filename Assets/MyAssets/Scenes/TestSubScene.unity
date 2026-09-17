@@ -365,7 +365,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assets.MyAssets.Scripts.Runtime::Assets.MyAssets.Scripts.Runtime.Enemy.EnemySpawnerAuthoring
   _enemyPrefab: {fileID: 9037194797816794288, guid: 162ff87e591df6f43805e974ef2122c6, type: 3}
-  _count: 500
+  _count: 1000
   _minRadius: 12
   _maxRadius: 40
   _respawnMinRadius: 32

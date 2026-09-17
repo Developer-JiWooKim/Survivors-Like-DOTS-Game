@@ -123,10 +123,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             float2 push = float2.zero;
             int examined = 0;
 
-            // 분리 반경(두 적의 반경 합)이 셀 크기보다 작으면 이웃 8칸이면 충분하다.
-            // 반경을 키워 셀보다 커지면 검사 범위를 넓혀야 누락이 없다 — 그래서 고정 1 이 아니라 계산한다.
-            // 상대 반경은 조회 전에 모르므로 "내 반경 × 2" 로 범위를 잡는다 (적 크기가 같다는 M1 가정).
-            int range = (int)math.ceil(selfRadius * 2f / EnemySpatialHash.CellSize);
+            // 분리 반경(두 적의 반경 합)이 셀 크기보다 작으면 이웃 8칸이면 충분하다 (현재 ±1).
+            // 반경이 커지면 검사 범위를 넓혀야 누락이 없다 — 그래서 고정 1 이 아니라 계산한다.
+            int range = EnemySpatialHash.CellRangeFor(selfRadius);
             int2 center = EnemySpatialHash.CellOf(position);
 
             for (int y = -range; y <= range; y++)
