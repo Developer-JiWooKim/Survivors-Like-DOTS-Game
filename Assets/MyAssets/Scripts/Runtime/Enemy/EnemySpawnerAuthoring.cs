@@ -20,6 +20,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         [Tooltip("스폰 링 바깥 반경.")]
         [SerializeField] private float _maxRadius = 40f;
 
+        [Tooltip("죽은 적을 되살릴 링의 안쪽 반경 (플레이어 기준). 카메라 size 15, 16:9 화면의 모서리가 약 30.6 이라 그 밖으로 잡았다.")]
+        [SerializeField] private float _respawnMinRadius = 32f;
+
+        [Tooltip("재스폰 링의 바깥 반경 (플레이어 기준).")]
+        [SerializeField] private float _respawnMaxRadius = 36f;
+
         [Tooltip("난수 시드. 고정하면 매 실행 같은 배치가 나와 성능 비교가 가능하다.")]
         [SerializeField] private uint _randomSeed = 1;
 
@@ -41,6 +47,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                     Count = authoring._count,
                     MinRadius = authoring._minRadius,
                     MaxRadius = authoring._maxRadius,
+                    RespawnMinRadius = authoring._respawnMinRadius,
+                    RespawnMaxRadius = authoring._respawnMaxRadius,
                     RandomSeed = authoring._randomSeed == 0 ? 1u : authoring._randomSeed,
                 });
             }

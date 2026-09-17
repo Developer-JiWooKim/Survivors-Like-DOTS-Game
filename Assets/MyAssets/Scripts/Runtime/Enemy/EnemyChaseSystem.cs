@@ -1,4 +1,5 @@
 using Assets.MyAssets.Scripts.Runtime.Player;
+using Assets.MyAssets.Scripts.Runtime.Pooling;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -52,6 +53,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     }
 
     [BurstCompile]
+    // 죽어서 풀에 들어간 적은 움직이지 않는다.
+    [WithAll(typeof(Active))]
     internal partial struct ChaseJob : IJobEntity
     {
         public float3 Target;

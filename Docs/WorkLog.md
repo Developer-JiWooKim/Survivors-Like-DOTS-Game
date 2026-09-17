@@ -15,16 +15,17 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 | | |
 |---|---|
 | **마일스톤** | **M1 진행 중** (M0 완료) |
-| **최근 작업** | 적 추격 이동 (첫 병렬 잡), Unity CLI 도입, asmdef 단축 |
-| **다음 작업** | 대시 / 파편탄 중 택 1 — **아직 미정** |
+| **최근 작업** | 파편탄 + 적 피격/사망 + enableable 풀링 **코드 완료, 컴파일 통과** (2026-09-17) |
+| **다음 작업** | ① 사용자 씬 구성(투사체 프리팹·풀·무기 연결) → 플레이 확인 → 성능 측정 → 커밋<br>② 플레이어 피격/사망 (접촉 피해 초당 10, 체력 100, 반경 0.4 — 합의됨)<br>③ 대시 → ④ XP 젬 + 레벨업 UI |
 | **미해결 이슈** | [ISSUE-002](IssueLog.md#issue-002) ⚠️ (재현 안 됨), [ISSUE-005](IssueLog.md#issue-005) ⏳ (M2로 의도적 보류) |
 
 **M1 체크리스트**
 ```
 ✅ 플레이어 이동 (WASD, 대각선 정규화)
 ✅ 적 추격 이동 (1,000, IJobEntity ScheduleParallel)
+🔶 파편탄 자동 발사 + 적 피격/사망  ← 코드 완료, 에디터 동작 확인 대기
+⬜ 플레이어 피격/사망
 ⬜ 대시 (쿨 3초, 0.15초 무적)
-⬜ 파편탄 자동 발사 + 피격/사망
 ⬜ XP 젬 + 레벨업 UI
 ```
 
@@ -65,9 +66,118 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 
 ---
 
+## 2026-09-17 — [M1] 파편탄 + 적 피격/사망 + enableable 풀링 🔶
+
+**커밋** `(미커밋)` | **관련 이슈** [ISSUE-008](IssueLog.md#issue-008), [ISSUE-001](IssueLog.md#issue-001) 재발
+
+> 상태: 코드 작성 + 컴파일 검증까지 완료. **에디터 씬 구성과 플레이 확인은 아직.**
+
+### 한 일
+
+| 폴더 | 파일 | 역할 |
+|---|---|---|
+| `Pooling/` | `Active.cs` | 풀 엔티티의 생존 여부 — **enableable 태그** |
+| | `PoolUtility.cs` | 메인 스레드에서 `Active` + `MaterialMeshInfo` 를 함께 토글 |
+| `Combat/` | `Health.cs`, `HitRadius.cs`, `DamageEvent.cs` | 체력(Current/Max), 판정 반경, 피해 이벤트 |
+| | `DamageEventBus.cs` | 발생원 시스템들이 `NativeStream` 과 잡 핸들을 등록하는 싱글턴 |
+| | `DamageApplySystem.cs` | 스트림 드레인 → `Health` 차감 (단일 스레드 잡 체인) |
+| `Weapon/` | `Projectile.cs`, `ProjectileAuthoring.cs` | 투사체 상태(속도·피해·남은 수명) |
+| | `ProjectilePool.cs`, `ProjectilePoolAuthoring.cs`, `ProjectilePoolSystem.cs` | 시작 시 64 개 생성 후 전부 비활성 |
+| | `ShardWeapon.cs`, `ShardWeaponAuthoring.cs` | 파편탄 수치 (플레이어에 부착) |
+| | `ShardFireSystem.cs` | 쿨다운 → 최근접 적 탐색(전수) → 풀에서 꺼내 발사 |
+| | `ProjectileMoveSystem.cs` | 직선 이동 + 수명 만료 시 풀 반환 (병렬) |
+| | `ProjectileHitSystem.cs` | 투사체×적 전수 겹침 검사 → 스트림 기록 (병렬) |
+| `Enemy/` | `EnemyDeathSystem.cs` | `Health ≤ 0` → 비활성 (병렬) |
+| | `EnemyRespawnSystem.cs` | 비활성 적을 플레이어 주변 링(32~36)에서 체력 채워 재활성 (병렬) |
+| | `RingSampler.cs` | 최초 스폰·재스폰이 같은 링 분포를 쓰도록 추출 |
+| | `EnemyAuthoring.cs` (수정) | `Health`(10), `HitRadius`(0.25), `Active` 추가 |
+| | `EnemyChaseSystem.cs` (수정) | `ChaseJob` 에 `[WithAll(typeof(Active))]` — 죽은 적은 안 움직임 |
+| | `EnemySpawner*.cs` (수정) | 재스폰 반경 필드 추가 |
+| `Editor/` | `UnlitMaterialBuilder.cs` (수정) | `ProjectileQuad` 추가, 기존 머티리얼 색 덮어쓰기 버그 수정 (ISSUE-008) |
+| `Materials/` | `ProjectileQuad.mat` (신규) | CLI(`unity command eval` 로 메뉴 실행)로 생성 |
+
+**시뮬레이션 순서** (기획서 8.2 번호 대응)
+```
+EnemyRespawnSystem (5)  → PlayerMoveSystem (7) → EnemyChaseSystem (8)
+→ ShardFireSystem (9+10) → ProjectileMoveSystem (11) → ProjectileHitSystem (12)
+→ DamageApplySystem (16) → EnemyDeathSystem (17)
+```
+적이 죽은 프레임엔 사라져 있고, **다음 프레임 첫 시스템**에서 링에 다시 나타난다.
+
+**런타임 구조적 변경**: 시작 시 적 1,000 + 투사체 64 Instantiate **각 1회뿐**. 이후 0회.
+
+### 왜 이렇게 했나
+
+**1. 최근접 탐색·충돌은 전수 비교, 결과는 스트림으로** (사용자 결정)
+
+- **대안**: (a) 공간 해시를 지금 구현 (b) 전수 비교 + 잡 안에서 `Health` 직접 차감
+- **선택 이유**: M1 규모(투사체 수 개 × 적 1,000)에선 전수 비교가 Burst 로 무시할 수준. 공간 해시는 M2 범위.
+  다만 **스트림 → 적용 시스템 구조는 기획서 최종형 그대로** 만들어서, M2 에선 `ProjectileHitJob` 의 적 순회 루프만 해시 조회로 바꾸면 된다.
+- **(b) 를 버린 이유**: 병렬 잡 두 개가 같은 적의 `Health` 를 쓰면 레이스. M2 에서 어차피 갈아엎어야 한다.
+- **면접 포인트**: M2 에서 교체 전후를 같은 조건으로 측정하면 "공간 해시가 얼마나 벌어줬나" 가 수치로 나온다.
+
+**2. 투사체·적 모두 enableable 풀링** (사용자 결정 — 추천안(M1 은 ECB 생성/파괴)과 다르게 감)
+
+- **대안**: (a) M1 은 ECB Instantiate/Destroy, M2 에서 풀링 (b) 투사체만 풀링
+- **선택 이유**: 기획서 8.4 의 최종 구조를 처음부터 따른다. 나중에 생명주기를 통째로 갈아엎는 비용을 피함.
+- **포기한 것**: "구조적 변경 비용 before/after" 측정 기회. 그리고 M1 코드량 증가.
+
+**3. `Active` 만 끄면 렌더링이 안 꺼진다 → `MaterialMeshInfo` 도 함께 토글**
+
+- Entities Graphics 는 우리 `Active` 태그를 모른다. 패키지 소스(`RenderMeshArray.cs:38`)에서
+  **`MaterialMeshInfo : IComponentData, IEnableableComponent`** 임을 확인 → 구조적 변경 없이 렌더만 끌 수 있다.
+- **대안**: `DisableRendering` 태그 추가/제거 — 구조적 변경이라 원칙 위반. / 비활성 엔티티를 화면 밖으로 순간이동 — 컬링·판정 쪽에 암묵적 가정이 생김.
+- 둘을 **반드시 함께** 바꿔야 해서 메인 스레드는 `PoolUtility.SetAlive` 한 곳, 잡은 `EnabledRefRW` 두 개로 통일.
+
+**4. `EnabledRefRW` 를 쓰는 잡은 쿼리를 직접 만들어 넘김**
+
+- `IJobEntity` 파라미터에 `EnabledRefRW<T>` 가 있을 때 기본 쿼리가 "켜진 것만" 인지 "있기만 하면" 인지를 **코드젠에 맡기지 않고** 명시.
+  `WithAllRW<Active>` (켜진 것만) / `WithDisabledRW<Active>` (꺼진 것만, 재스폰) / `WithPresentRW<MaterialMeshInfo>` (상태 무관).
+- 공식 문서 예제(`EnableableComponentExample.cs`)만으로는 기본 쿼리 필터링이 확정되지 않아서 택한 방어적 선택.
+
+**5. 데미지 버스 — 스트림마다 적용 잡 하나씩 직렬 체인**
+
+- 처음 설계: 등록된 스트림들을 `NativeArray<NativeStream>` 으로 잡 하나에 넘기기.
+  → **컨테이너 안의 컨테이너는 잡 안전 검사에서 거부된다**는 걸 떠올리고 작성 중에 폐기.
+- 그 전 초안은 적용 잡을 예약한 직후 `Complete()` 를 불러 사실상 메인 스레드 실행이었다 — 잡으로 만든 의미가 없어 폐기.
+- 최종: 스트림마다 `ApplyDamageJob{Reader}` 를 `Schedule(chain)` 으로 직렬 연결, 해제(`stream.Dispose(handle)`)도 체인 뒤에 예약. 메인 스레드 대기 0.
+- 버스 소유·해제 책임은 `DamageApplySystem` 한 곳 (Unity 의 ECB 시스템 싱글턴과 같은 패턴).
+
+**6. 발사는 메인 스레드**
+
+- 초당 2 회, 최근접 탐색도 발사 프레임에만 적 1,000 을 훑음. 잡 스케줄 비용이 더 크다고 판단.
+- **알려진 비용**: 발사 프레임에 `GetComponent<LocalTransform>` / `ToComponentDataArray` 가 적 이동 잡 완료를 기다리는 **동기화 지점**을 만든다. 프로파일러에서 보이면 잡으로 이관.
+- 쿨다운은 `+= Interval` 누적 (평균 연사 속도 정확). 대상·투사체가 없으면 0 에 고정 — 음수로 쌓이면 대상이 생기는 순간 몰아서 발사되기 때문.
+
+**7. 재스폰 = 죽은 적 전부 즉시 링으로** (사용자 결정: 주기적 링 스폰)
+
+- 풀 크기 = 목표 동시 적 수(1,000) 이므로 꺼진 적을 전부 살리면 수가 유지된다. **새 수치(보충 속도)가 필요 없는** 가장 단순한 형태.
+- 재스폰 반경 32~36 은 **기획서에 없는 값** — 카메라 size 15 · 16:9 화면 모서리 거리 ≈ 30.6 바깥으로 잡음. 인스펙터에서 조정 가능.
+- 병렬 잡의 난수는 `Random.CreateFromIndex(hash(seed, frame) ^ entityIndexInQuery)` — 스레드 간 공유 없이 결정적.
+
+**수치** (기획서에 없음 → 제안 기본값 사용, 사용자 승인)
+
+| 항목 | 값 |
+|---|---|
+| 파편탄 발사 간격 / 탄속 / 피해 / 수명 | 0.5 s / 12 u/s / 5 / 1.5 s (사거리 18) |
+| 투사체 판정 반경 / 풀 크기 | 0.15 / 64 |
+| 적 체력 / 판정 반경 | 10 (기획서) / 0.25 (기획서 8.3) |
+| 관통 | 없음 |
+
+### 검증
+- `bash Tools/unity-recompile.sh` → **컴파일 성공**, Editor.log 에 프로젝트 경고 없음
+- **미검증**: 실제 플레이 동작, Burst 컴파일 런타임 에러, 성능 → 사용자 씬 구성 후 확인
+
+### 배운 것 / 다음에 다르게 할 것
+- enableable 로 "죽음" 을 표현하면 **렌더링·물리 등 다른 패키지는 그 의미를 모른다.** 각 패키지의 enableable 컴포넌트를 찾아 같이 꺼야 한다.
+- 에디터 명령(메뉴 실행)을 돌린 뒤엔 `git status` 로 부수 효과를 확인한다 — 이번에 사용자 머티리얼 색이 덮어써진 걸 그렇게 잡았다 (ISSUE-008).
+- `ProjectSettings/URPProjectSettings.asset` 에 `m_ProjectSettingFolderPath` 한 줄이 에디터에 의해 추가됨 — 우리 코드와 무관한 URP 자동 변경.
+
+---
+
 ## 2026-09-16 — [M1] 적 추격 이동 (첫 병렬 잡) ✅
 
-**커밋** `(미커밋)` | **관련 이슈** [ISSUE-006](IssueLog.md#issue-006) [ISSUE-007](IssueLog.md#issue-007)
+**커밋** `c097359` | **관련 이슈** [ISSUE-006](IssueLog.md#issue-006) [ISSUE-007](IssueLog.md#issue-007)
 
 ### 한 일
 - `Enemy/EnemyMovement.cs` — 적 이동 속도 컴포넌트

@@ -10,7 +10,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     /// 모든 쿼리에서 자동으로 제외된다. 씬 안의 오브젝트를 원본으로 쓰면 그 원본 자체도
     /// 살아있는 적으로 취급돼 같이 플레이어를 쫓아온다.
     ///
-    /// 링 스폰·풀링·리사이클(기획서 6.2)은 M2 작업이다. 여기서는 시작 시 일괄 생성만 한다.
+    /// 시작 시 Count 만큼 일괄 생성하고, 이 엔티티들이 그대로 풀이 된다.
+    /// 죽은 적은 파괴하지 않고 <see cref="EnemyRespawnSystem"/> 이 재스폰 링으로 되살린다.
+    /// 예산 기반 스폰 디렉터·화면 이탈 리사이클(기획서 6.2)은 M2 이후 작업이다.
     /// </summary>
     public struct EnemySpawner : IComponentData
     {
@@ -25,6 +27,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
 
         /// <summary>스폰 링의 바깥 반경.</summary>
         public float MaxRadius;
+
+        /// <summary>죽은 적을 되살릴 링의 안쪽 반경. 원점이 아니라 **플레이어** 기준이다.</summary>
+        public float RespawnMinRadius;
+
+        /// <summary>재스폰 링의 바깥 반경.</summary>
+        public float RespawnMaxRadius;
 
         /// <summary>난수 시드. 고정하면 매 실행 같은 배치가 나와 성능 비교가 가능하다.</summary>
         public uint RandomSeed;

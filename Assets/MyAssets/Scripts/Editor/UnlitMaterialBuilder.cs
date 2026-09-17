@@ -30,6 +30,9 @@ namespace Assets.MyAssets.Scripts.Editor
             Create("EnemyQuad", new Color(0.85f, 0.25f, 0.25f, 1f));
             Create("BenchmarkQuad", new Color(0.85f, 0.25f, 0.25f, 1f));
 
+            // 기획서 9장: 투사체 = 작은 흰 도형. 플레이어보다 약간 푸르게 해 겹쳐도 구분되게 한다.
+            Create("ProjectileQuad", new Color(0.85f, 0.95f, 1f, 1f));
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
@@ -54,6 +57,10 @@ namespace Assets.MyAssets.Scripts.Editor
             if (material == null)
             {
                 material = new Material(shader);
+
+                // 색은 처음 만들 때만 칠한다. 이미 있는 머티리얼의 색은 사용자가 에디터에서
+                // 눈으로 조정한 값일 수 있어 덮어쓰지 않는다 (ISSUE-008).
+                material.SetColor("_BaseColor", color);
                 AssetDatabase.CreateAsset(material, path);
             }
             else
@@ -61,9 +68,8 @@ namespace Assets.MyAssets.Scripts.Editor
                 material.shader = shader;
             }
 
-            // 이게 꺼져 있으면 엔티티 1만 개가 드로우콜 1만 개가 된다.
+            // 이게 꺼져 있으면 엔티티 1만 개가 드로우콜 1만 개가 된다. 이건 기존 머티리얼에도 강제한다.
             material.enableInstancing = true;
-            material.SetColor("_BaseColor", color);
 
             EditorUtility.SetDirty(material);
             Debug.Log($"[UnlitMaterialBuilder] {path} 생성/갱신 (GPU Instancing: {material.enableInstancing})");
