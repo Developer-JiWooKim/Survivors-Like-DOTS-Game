@@ -80,6 +80,7 @@
   <Project Path="Unity.Mathematics.Extensions.csproj" />
   <Project Path="Unity.Entities.Graphics.Editor.csproj" />
   <Project Path="Unity.Transforms.Hybrid.csproj" />
+  <Project Path="Survivors.Editor.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.RenderPipelines.Core.Editor.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.004.csproj" />
   <Project Path="Unity.Collections.Tests.CoreCLR.PublicJobPrivateGeneric.csproj" />
@@ -95,7 +96,6 @@
   <Project Path="Unity.Pipeline.CodeGen.csproj" />
   <Project Path="Unity.Collections.Tests.CoreCLR.ProtectedJobNested.csproj" />
   <Project Path="Unity.Burst.csproj" />
-  <Project Path="Survivors.Editor.csproj" />
   <Project Path="Unity.Rendering.LightTransport.Editor.csproj" />
   <Project Path="Unity.Collections.Editor.csproj" />
   <Project Path="Unity.RenderPipelines.Universal.Config.Runtime.csproj" />

@@ -25,7 +25,7 @@ Unity 6 DOTS 2D 뱀서라이크 — **발생한 이슈와 대응** 기록.
 | [002](#issue-002) | 2026-09-16 | M0 | 툴링 | `unity-test.sh` 첫 실행이 exit 255로 종료 (Unity 로그는 정상) | ⚠️ 미해결 | - |
 | [003](#issue-003) | 2026-09-16 | M0 | 툴링 | `unity-check.sh` 가 DOTS 분석기 에러(DC0061)를 놓침 | ✅ 해결 | 2026-09-16 |
 | [004](#issue-004) | 2026-09-16 | M0 | 성능 | 드로우콜 카운터가 BRG 인스턴싱을 0 으로 보고 | ✅ 해결 | 2026-09-16 |
-| [005](#issue-005) | 2026-09-16 | M0 | 렌더링 | 지오메트리가 2배로 제출됨 (인스턴스 20004 vs 엔티티 10002) | ⏳ 진행중 | - |
+| [005](#issue-005) | 2026-09-16 | M0 | 렌더링 | 지오메트리가 2배로 제출됨 — 원인: URP SSAO 의 DepthNormal 프리패스 | ✅ 해결 | 2026-09-17 |
 | [006](#issue-006) | 2026-09-16 | M1 | DOTS | `ChaseJob` 완료 전 메인 스레드가 `LocalTransform` 읽어 예외 6,110건 | ✅ 해결 | 2026-09-16 |
 | [007](#issue-007) | 2026-09-16 | M1 | 툴링 | `unity-recompile.sh` 가 `up_to_date` 상태를 실패로 오판 | ✅ 해결 | 2026-09-16 |
 | [008](#issue-008) | 2026-09-17 | M1 | 툴링 | 머티리얼 빌더 재실행 시 사용자가 바꾼 `EnemyQuad` 색을 덮어씀 | ✅ 해결 | 2026-09-17 |
@@ -343,8 +343,8 @@ SRP(URP) 에서는 값이 채워지지 않는 것으로 추정된다. `"SetPass 
 | **발생일시** | 2026-09-16 |
 | **마일스톤** | M0 |
 | **분류** | 렌더링 |
-| **상태** | ⏳ 진행중 (동작에는 문제 없음, 최적화 여지) |
-| **해결일** | - |
+| **상태** | ✅ 해결 (원인: SSAO → DepthNormal 프리패스. 비활성화) |
+| **해결일** | 2026-09-17 |
 | **관련 작업** | [WorkLog 2026-09-16 (M0)](WorkLog.md) |
 
 **증상**
@@ -369,7 +369,7 @@ Draw Calls : 16 (20004 instances)
 
 에디터 플레이 모드, URP Universal Renderer(PC_Renderer), 엔티티 10,000.
 
-**원인 (가설, 미확정)**
+**원인 (M0 당시 가설 — 아래 재조사에서 틀린 것으로 확인)**
 
 URP Universal Renderer 의 **깊이 프리패스(Depth Priming / DepthNormals prepass)** 가
 같은 지오메트리를 한 번 더 제출하는 것으로 추정된다. 제출량이 정확히 2 배인 것이 이를 뒷받침한다.
@@ -381,6 +381,76 @@ URP Universal Renderer 의 **깊이 프리패스(Depth Priming / DepthNormals pr
 지금은 성능에 여유가 있어(2.94ms / 340 FPS) 문제가 되지 않는다. **M2 에서 적 1만 + 이동 + 충돌이
 얹혀 프레임이 빠듯해지면** `PC_Renderer` 의 Depth Priming 설정을 끄고 before/after 를 측정한다.
 지금 끄면 무엇 덕분에 빨라졌는지 구분이 안 되므로 미룬다.
+
+**재조사 — 2026-09-17 (M2)**
+
+에셋 파일을 읽기 전용으로 확인한 결과, **위 가설(Depth Priming)은 틀렸다.**
+
+| 확인 항목 | 값 | 의미 |
+|---|---|---|
+| 활성 품질 | `m_CurrentQuality: 1` = **PC** → `PC_RPAsset` | 에디터가 쓰는 파이프라인 |
+| `PC_Renderer.m_DepthPrimingMode` | **0 (Disabled)** | **Depth Priming 은 이미 꺼져 있다 → 원인 아님** |
+| `PC_Renderer.m_RenderingMode` | 2 (Forward+) | |
+| `PC_RPAsset.m_RequireDepthTexture` | **1** | 깊이 텍스처 요청 → 조건에 따라 **DepthOnly 프리패스**로 지오메트리를 한 번 더 그림 (후보 ①) |
+| `PC_RPAsset.m_RequireOpaqueTexture` | 1 | 색 복사일 뿐 지오메트리 재제출 아님 |
+| `PC_RPAsset.m_MainLightShadowsSupported` | 1 | 그림자 후보였으나 ↓ |
+| URP `Unlit.shader` 패스 | UniversalForward · GBuffer · **DepthOnly** · DepthNormalsOnly · Meta · **MotionVectors** | **ShadowCaster 패스가 없다 → 그림자는 원인 아님** |
+| `Enemy.prefab` MeshRenderer | `m_MotionVectors: 1` (Per Object) | 움직이는 엔티티가 **MotionVectors 패스**로 한 번 더 그려질 수 있음 (후보 ②) |
+
+- 남은 후보: ① 깊이 텍스처용 **DepthOnly 프리패스** ② **MotionVectors 패스**.
+- 파일만으로는 어느 쪽인지 가릴 수 없다 → **Frame Debugger 로 실제 패스 목록 확인** (사용자, 렌더는 CLI 불가).
+- 배운 것: 가설을 세웠으면 **설정값부터 확인**했어야 했다. M0 에서 "Depth Priming 추정" 을 적을 때 에셋 값을 읽지 않았다.
+
+**원인 확정 — Frame Debugger (사용자 캡처, 2026-09-17)**
+
+| 관측 | 의미 |
+|---|---|
+| 패스 목록에 `(RP 1:0) DrawDepthNormalPrepass` → `(RP 6:0) DrawOpaqueObjects` | 본 그리기 전에 **깊이+노멀 프리패스**가 지오메트리를 한 번 더 그린다 = 제출량 2 배 |
+| 적 드로우(`Hybrid Batch Group`) 키워드에 **`_SCREEN_SPACE_OCCLUSION`** | **SSAO** 가 켜져 있다 → SSAO 는 노멀이 필요해 DepthNormal 프리패스를 강제한다 |
+| `MotionVectors` 패스 없음 | 후보 ② 기각 |
+| `PC_Renderer.asset` → `m_RendererFeatures` 에 **`ScreenSpaceAmbientOcclusion` (`m_Active: 1`)** | URP 템플릿 기본값으로 들어 있던 기능 |
+
+→ **원인: `PC_Renderer` 의 SSAO 렌더러 기능.** 단색 2D 탑다운에는 쓸모가 거의 없다.
+
+**결정 (사용자)**: SSAO **비활성화** (삭제가 아니라 끄기 — 되돌리기 쉽게). **끄기 전후를 같은 조건에서 연달아 측정**한다 (벤치마크 모드 적 10,000).
+**조치 (2026-09-17)**
+
+| 단계 | 내용 | 결과 |
+|---|---|---|
+| Before 측정 (사용자) | SSAO 켜짐, 벤치마크 모드 적 10,000 | FPS 207.4 (4.82 ms) · Main 4.75 ms · **Tris 40,470** · PlayerLoop 2~3.3 ms |
+| 비활성화 | `Editor/RendererFeatureSettings.cs` 메뉴 **Tools/렌더러/SSAO 끄기** 를 CLI(`unity command eval`)로 실행 | `m_Active: 1 → 0` |
+| After 측정 1 차 (사용자) | SSAO 꺼짐, 같은 조건 | **Tris 20,407 (정확히 절반)** · `DrawDepthNormalPrepass` 사라짐 → **원인 확정** / FPS 70~128 요동 · Main 57.33 ms · PlayerLoop 평균 3 ms |
+| 1 차 해석 | Main 57 ms 면 FPS ≈ 17 이어야 하는데 오버레이는 70~128 → **모순**. Main 은 한 프레임 값이라 스파이크가 찍힌 것으로 보인다. 그리기 양이 절반인데 느려진 것도 설명되지 않음 → **Frame Debugger 가 Enable 된 채 측정**(매 프레임 이벤트 수집으로 에디터가 크게 느려짐) 가능성이 가장 높다 | **성능 비교는 무효 처리, 재측정** |
+| After 측정 2 차 (사용자) | Profiler · Frame Debugger **모두 끔** | 프레임 끊김 사라짐, **150 FPS (6.58 ms) 안정** → 1 차의 요동은 두 도구 탓으로 확인. 단 Before(Profiler 켜짐, 207 FPS)와 조건이 달라 비교 불가 |
+| **A/B 측정 (사용자 + CLI 토글)** | Profiler · FD 끔, 벤치마크 10,000, 메뉴로 SSAO 만 켜고 끄며 연달아 측정 | 아래 표 |
+
+| SSAO | FPS | Main | Tris |
+|---|---|---|---|
+| 꺼짐 | 150대 | 6.3 ms | 20,403 |
+| 켜짐 | 157 | 6.19 ms | 40,442 |
+
+**결론**
+- **원인 확정**: SSAO 토글에 따라 Tris 가 정확히 2 배 ↔ 1 배. ✅
+- **에디터에서 FPS 차이는 측정되지 않음** (150 vs 157 은 측정 간 편차 수준). 프레임 시간(≈6.4~6.6 ms)의 대부분이 Main(≈6.2 ms) → **현재 병목은 CPU(메인 스레드)이고 GPU 는 여유**. GPU 작업이 절반이 돼도 FPS 에 드러나지 않는다.
+- **SSAO 는 꺼 둔다** (사용자 결정 유지): 단색 2D 에 시각적 이득이 거의 없고 GPU 작업만 2 배. 약한 GPU · 고해상도 · 빌드에서 차이가 드러날 수 있다 → 빌드 실측 때 재확인.
+- **측정 교훈**
+  - Profiler · Frame Debugger 는 에디터를 크게 느리게 하고 수치를 흔든다. **FPS 비교는 둘 다 끄고**, PlayerLoop 같은 내부 수치가 필요할 때만 Profiler 를 켠 채 **따로** 잰다.
+  - 설정 하나의 효과는 **같은 세션에서 그 설정만 토글**해 재는 것이 가장 확실하다 (메뉴 + CLI 로 토글).
+  - 참고: CLI `EditorApplication.isPlaying` 조회가 두 번 모두 false 를 반환했다. 사용자가 측정 후 플레이를 멈췄는지, eval 컨텍스트 문제인지는 확인하지 않았다 — 결과 판단에는 영향 없음 (Tris 로 설정 적용 확인).
+
+**해결**: `PC_Renderer` 의 SSAO 비활성화 (`Tools/렌더러/SSAO 끄기`, 되돌리기는 `SSAO 켜기`).
+
+**재발 방지**
+- URP 템플릿의 기본 렌더러 기능(SSAO 등)은 **프로젝트 성격에 맞는지 초기에 점검**한다. 2D 단색 프로토타입에는 불필요한 패스가 섞여 있었다.
+- "제출량 2 배" 같은 증상은 **Frame Debugger 의 패스 목록**부터 본다. 설정 파일 추측보다 빠르고 정확했다.
+
+- **부수 변경 (에디터 저장에 의한 URP 에셋 형식 갱신)**: `PC_Renderer.asset` 이 템플릿 생성 후 처음 저장되면서 Unity 가 현재 URP 형식으로 다시 직렬화했다.
+  `m_AssetVersion 2 → 3`, 새 필드(`m_PrepassLayerMask` · `m_DepthAttachmentFormat` · `m_DepthTextureFormat` · `m_TileOnlyMode` · `xrSystemData`) 추가,
+  구형 SSAO 리소스 참조(`m_BlueNoise256Textures` · `m_Shader`)와 `m_UseNativeRenderPass` 제거, SSAO 서브에셋 `m_ObjectHideFlags 0 → 1`.
+  **YAML 을 직접 편집한 것이 아니고**, 에디터에서 이 에셋을 저장하면 누구든 똑같이 생기는 변경이다. 커밋 시 함께 포함한다.
+- 스크립트 초안의 주석에 "SSAO 클래스가 internal 이라 타입 이름으로 찾는다" 고 적었다가, 패키지 소스를 확인하니 **public** 이었다 → `is ScreenSpaceAmbientOcclusion` 타입 검사로 수정. (확인하지 않은 사실을 주석에 쓰지 않는다.)
+
+- Frame Debugger 읽는 법 메모: 왼쪽 목록은 이번 프레임의 그리기 이벤트를 **순서대로** 보여준다. `(RP n:m)` 이 붙은 굵은 항목이 **패스 이름**이고, 오른쪽 Keywords 는 그 드로우에 켜진 셰이더 기능이다.
 
 ---
 

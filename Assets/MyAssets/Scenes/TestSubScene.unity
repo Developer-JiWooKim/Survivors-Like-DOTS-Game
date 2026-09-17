@@ -428,6 +428,7 @@ MonoBehaviour:
   _poolSize: 20000
   _respawnMinRadius: 32
   _respawnMaxRadius: 36
+  _recycleDistance: 45
   _baseBudget: 50
   _growthPerMinute: 1.28
   _testTimeScale: 10
