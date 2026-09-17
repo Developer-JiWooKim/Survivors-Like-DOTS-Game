@@ -335,10 +335,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f54a09e892e7dc24185d71d6990bc67a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Survivors.Runtime::Assets.MyAssets.Scripts.Runtime.Weapon.ShardWeaponAuthoring
-  _interval: 0.5
+  _interval: 0.15
   _projectileSpeed: 12
   _damage: 5
   _projectileLifetime: 1.5
+  _targetCount: 3
+  _projectilesPerTarget: 1
+  _spreadDegrees: 15
+  _pierce: 0
+  _explosionRadius: 0
+  _explosionDamageRatio: 0.5
 --- !u!1 &1449323348
 GameObject:
   m_ObjectHideFlags: 0
@@ -369,7 +375,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Survivors.Runtime::Assets.MyAssets.Scripts.Runtime.Weapon.ProjectilePoolAuthoring
   _prefab: {fileID: 6926238244896003892, guid: 8f91388c9d910b0429e754d48ae1f363, type: 3}
-  _capacity: 64
+  _capacity: 512
 --- !u!4 &1449323350
 Transform:
   m_ObjectHideFlags: 0
@@ -415,11 +421,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assets.MyAssets.Scripts.Runtime::Assets.MyAssets.Scripts.Runtime.Enemy.EnemySpawnerAuthoring
   _enemyPrefab: {fileID: 9037194797816794288, guid: 162ff87e591df6f43805e974ef2122c6, type: 3}
-  _count: 20
-  _minRadius: 12
-  _maxRadius: 40
+  _poolSize: 20000
   _respawnMinRadius: 32
   _respawnMaxRadius: 36
+  _baseBudget: 50
+  _growthPerMinute: 1.28
+  _testTimeScale: 10
   _separationStrength: 1.5
   _separationMaxNeighbors: 16
   _randomSeed: 1

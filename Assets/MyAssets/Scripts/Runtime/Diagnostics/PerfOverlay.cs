@@ -1,4 +1,7 @@
 using System.Text;
+using Assets.MyAssets.Scripts.Runtime.Enemy;
+using Assets.MyAssets.Scripts.Runtime.Run;
+using Assets.MyAssets.Scripts.Runtime.UI;
 using Unity.Entities;
 using Unity.Profiling;
 using UnityEngine;
@@ -33,6 +36,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
         private ProfilerRecorder _mainThreadTime;
 
         private readonly StringBuilder _text = new StringBuilder(256);
+        private readonly SingletonAccess<RunState> _runState = new SingletonAccess<RunState>();
+        private readonly SingletonAccess<SpawnDirector> _director = new SingletonAccess<SpawnDirector>();
         private GUIStyle _style;
 
         private float _refreshTimer;
@@ -100,6 +105,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
             }
 
             _text.AppendFormat("Ents  {0,7}\n", CountEntities());
+
+            // 적 풀(2 만)이 Ents 에 포함되므로, 실제로 살아있는 적 수는 따로 보여준다.
+            if (_runState.TryRead(out RunState run))
+            {
+                int seconds = (int)run.ElapsedSeconds;
+                _text.AppendFormat("Time  {0,4}:{1:00}\n", seconds / 60, seconds % 60);
+            }
+
+            if (_director.TryRead(out SpawnDirector director))
+            {
+                _text.AppendFormat("Enemy {0,6}/{1}\n", director.Alive, director.Target);
+                _text.AppendFormat("E.HP  {0,7:F1}\n", director.SpawnHealth);
+            }
 
             AppendRenderStats();
 
@@ -179,7 +197,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
             };
 
             const int width = 220;
-            const int height = 158;
+            const int height = 216; // 줄 추가(Time, Enemy, E.HP)에 맞춰 늘림
             var rect = new Rect(10f, 10f, width, height);
 
             // 배경을 깔지 않으면 밝은 화면에서 글자가 안 보인다.

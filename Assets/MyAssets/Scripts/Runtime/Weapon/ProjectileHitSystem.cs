@@ -24,7 +24,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
     /// 해시의 적 위치는 이번 프레임 **이동 전** 스냅샷이다. 적은 한 프레임에 0.04 u 정도 움직여
     /// 판정 반경(0.25 + 0.15)에 비해 무시할 수준이다.
     ///
-    /// 관통은 없다 — 처음 겹친 적 하나만 맞히고 풀로 돌아간다.
+    /// 관통: 한 프레임에 **아직 맞히지 않은** 적 하나만 맞힌다. 관통 횟수가 남아 있으면 계속 날아가고,
+    /// 맞힌 적은 <see cref="Projectile.HitHistory"/> 에 남겨 겹쳐 있는 동안 다시 때리지 않는다.
+    /// 한 프레임에 한 마리로 제한한 이유: 탄이 한 프레임에 이동하는 거리(약 0.2 u)가 적 지름(0.5)보다 작아
+    /// 붙어 있는 적들도 다음 프레임에 차례로 맞는다. 루프를 단순하게 유지하는 쪽을 택했다.
+    ///
+    /// 폭발: 명중 지점 반경 안의 **다른** 적들에게 폭발 피해를 준다. 직격 대상은 직격 피해만 받는다.
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(GameplaySystemGroup))]
@@ -38,7 +43,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
         {
             // 쿼리를 명시하는 이유는 ProjectileMoveSystem 과 같다.
             _projectileQuery = SystemAPI.QueryBuilder()
-                .WithAll<Projectile, LocalTransform, HitRadius>()
+                .WithAll<LocalTransform, HitRadius>()
+                .WithAllRW<Projectile>() // 관통 횟수·명중 기록을 갱신한다
                 .WithAllRW<Active>()
                 .WithPresentRW<MaterialMeshInfo>()
                 .Build();
@@ -93,27 +99,86 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
 
         private void Execute(
             in LocalTransform transform,
-            in Projectile projectile,
+            ref Projectile projectile,
             in HitRadius radius,
             EnabledRefRW<Active> active,
             EnabledRefRW<MaterialMeshInfo> visible)
         {
-            if (!TryFindOverlap(transform.Position.xy, radius.Value, out Entity target))
+            float2 position = transform.Position.xy;
+            if (!TryFindOverlap(position, radius.Value, ref projectile.HitHistory, out AgentRef target))
             {
                 return;
             }
 
             Writer.Write(new DamageEvent
             {
-                Target = target,
+                Target = target.Entity,
                 Amount = projectile.Damage,
             });
 
-            active.ValueRW = false;
-            visible.ValueRW = false;
+            if (projectile.ExplosionRadius > 0f)
+            {
+                // 폭발 중심은 탄 위치가 아니라 맞은 적의 위치 — 적 중심에서 퍼지는 게 눈으로 보기에 자연스럽다.
+                Explode(target.Position, projectile.ExplosionRadius, projectile.ExplosionDamage, target.Entity);
+            }
+
+            if (projectile.PierceRemaining <= 0)
+            {
+                active.ValueRW = false;
+                visible.ValueRW = false;
+                return;
+            }
+
+            projectile.PierceRemaining--;
+
+            // 목록이 가득 차면(관통 상한을 넘게 설정한 경우) 가장 오래된 기록을 버린다.
+            // 오래된 적은 이미 멀리 지나쳤을 가능성이 높다.
+            if (projectile.HitHistory.Length == projectile.HitHistory.Capacity)
+            {
+                projectile.HitHistory.RemoveAt(0);
+            }
+            projectile.HitHistory.Add(target.Entity);
         }
 
-        private bool TryFindOverlap(float2 position, float radius, out Entity target)
+        private void Explode(float2 center, float explosionRadius, float damage, Entity directHit)
+        {
+            int range = EnemySpatialHash.CellRangeFor(explosionRadius);
+            int2 centerCell = EnemySpatialHash.CellOf(center);
+
+            for (int y = -range; y <= range; y++)
+            {
+                for (int x = -range; x <= range; x++)
+                {
+                    int key = EnemySpatialHash.KeyOf(centerCell + new int2(x, y));
+                    if (!Enemies.TryGetFirstValue(key, out AgentRef enemy, out NativeParallelMultiHashMapIterator<int> iterator))
+                    {
+                        continue;
+                    }
+
+                    do
+                    {
+                        if (enemy.Entity == directHit)
+                        {
+                            continue;
+                        }
+
+                        float reach = explosionRadius + enemy.Radius;
+                        if (math.distancesq(center, enemy.Position) <= reach * reach)
+                        {
+                            Writer.Write(new DamageEvent
+                            {
+                                Target = enemy.Entity,
+                                Amount = damage,
+                            });
+                        }
+                    }
+                    while (Enemies.TryGetNextValue(out enemy, ref iterator));
+                }
+            }
+        }
+
+        // alreadyHit 가 ref 인 이유: FixedList 의 Contains 는 ref this 확장이라 in(읽기 전용)으로는 호출할 수 없다.
+        private bool TryFindOverlap(float2 position, float radius, ref FixedList128Bytes<Entity> alreadyHit, out AgentRef target)
         {
             int range = EnemySpatialHash.CellRangeFor(radius);
             int2 center = EnemySpatialHash.CellOf(position);
@@ -131,9 +196,10 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
                     do
                     {
                         float reach = radius + enemy.Radius;
-                        if (math.distancesq(position, enemy.Position) <= reach * reach)
+                        if (math.distancesq(position, enemy.Position) <= reach * reach
+                            && !alreadyHit.Contains(enemy.Entity))
                         {
-                            target = enemy.Entity;
+                            target = enemy;
                             return true;
                         }
                     }
@@ -141,7 +207,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
                 }
             }
 
-            target = Entity.Null;
+            target = default;
             return false;
         }
     }

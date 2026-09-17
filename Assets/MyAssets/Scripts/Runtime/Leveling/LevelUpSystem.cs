@@ -1,5 +1,6 @@
 using Assets.MyAssets.Scripts.Runtime.Player;
 using Assets.MyAssets.Scripts.Runtime.Run;
+using Assets.MyAssets.Scripts.Runtime.Weapon;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -36,6 +37,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
 
             state.RequireForUpdate<PlayerExperience>();
             state.RequireForUpdate<RunState>();
+
+            // 선택지 후보를 거르려면 무기 상태가 필요하다.
+            state.RequireForUpdate<ShardWeapon>();
         }
 
         [BurstCompile]
@@ -61,8 +65,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
                 experience.ValueRW.Level++;
                 experience.ValueRW.XpToNext = PlayerExperience.RequiredFor(experience.ValueRO.Level);
 
+                // ShardWeapon 은 메인 스레드에서만 바뀌므로 읽어도 기다릴 잡이 없다.
+                ShardWeapon weapon = SystemAPI.GetSingleton<ShardWeapon>();
+
                 RefRW<LevelUpState> levelUp = SystemAPI.GetComponentRW<LevelUpState>(state.SystemHandle);
-                Offer(ref levelUp.ValueRW);
+                Offer(ref levelUp.ValueRW, weapon);
 
                 runState.ValueRW.Phase = RunPhase.Paused;
                 Debug.Log($"[LevelUp] Lv.{experience.ValueRO.Level} — 선택 대기");
@@ -70,13 +77,18 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
             }
         }
 
-        /// <summary>강화 목록에서 서로 다른 3 개를 무작위로 고른다 (부분 Fisher–Yates 셔플).</summary>
-        private static void Offer(ref LevelUpState levelUp)
+        /// <summary>
+        /// 최대치가 아닌 강화 중 서로 다른 3 개를 무작위로 고른다 (부분 Fisher–Yates 셔플).
+        /// </summary>
+        private static void Offer(ref LevelUpState levelUp, in ShardWeapon weapon)
         {
             var pool = new FixedList32Bytes<byte>();
             for (int i = 0; i < UpgradeTable.Count; i++)
             {
-                pool.Add((byte)i);
+                if (!UpgradeTable.IsMaxed((UpgradeType)i, weapon))
+                {
+                    pool.Add((byte)i);
+                }
             }
 
             for (int i = 0; i < LevelUpState.OptionCount; i++)

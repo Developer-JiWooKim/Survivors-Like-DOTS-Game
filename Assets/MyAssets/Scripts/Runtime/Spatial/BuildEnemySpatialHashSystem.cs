@@ -20,7 +20,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Spatial
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(GameplaySystemGroup))]
-    [UpdateAfter(typeof(EnemyRespawnSystem))]
+    [UpdateAfter(typeof(EnemySpawnDirectorSystem))]
     [UpdateBefore(typeof(EnemyChaseSystem))]
     public partial struct BuildEnemySpatialHashSystem : ISystem
     {

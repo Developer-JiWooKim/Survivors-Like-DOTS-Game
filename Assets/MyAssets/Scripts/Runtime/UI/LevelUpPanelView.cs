@@ -99,6 +99,11 @@ namespace Assets.MyAssets.Scripts.Runtime.UI
                 UpgradeType.ShardProjectileSpeed => "Shard Speed +20%",
                 UpgradeType.MoveSpeed => "Move Speed +10%",
                 UpgradeType.MaxHealth => "Max HP +20",
+                UpgradeType.TargetCount => "Targets +1",
+                UpgradeType.ProjectileCount => "Projectiles +1 (per target)",
+                UpgradeType.Spread => "Spread +15°",
+                UpgradeType.Pierce => "Pierce +1",
+                UpgradeType.Explosion => "Explosion (unlock / radius +0.5)",
                 _ => upgrade.ToString(),
             };
         }

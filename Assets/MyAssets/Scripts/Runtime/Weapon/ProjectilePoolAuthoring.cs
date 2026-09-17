@@ -12,7 +12,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
         [SerializeField] private GameObject _prefab;
 
         [Tooltip("미리 만들어 둘 투사체 수. 동시에 날아다닐 수 있는 최대치다. 바닥나면 발사를 건너뛴다.")]
-        [SerializeField] private int _capacity = 64;
+        [SerializeField] private int _capacity = 512;
 
         private sealed class ProjectilePoolBaker : Baker<ProjectilePoolAuthoring>
         {

@@ -47,9 +47,26 @@ for _ in $(seq 1 60); do
 
   case "$STATUS" in
     # up_to_date: 바뀐 게 없어 재컴파일할 필요가 없었다는 뜻. 실패가 아니다.
-    completed|up_to_date|idle|done) break ;;
+    completed|up_to_date|idle|done)
+      # "실패인데 에러 0 건" 은 **지난 컴파일의 낡은 결과**다 (ISSUE-010).
+      # 새 컴파일이 시작되기 전에 상태를 읽었고, 에러 목록은 위의 clear_console 로 이미 비워졌다.
+      # 진짜 결과가 나올 때까지 계속 폴링한다.
+      if printf '%s' "$INNER" | grep -qE '"(compilationFailed|failed)":true' \
+         && printf '%s' "$INNER" | grep -qE '"errors":\[\]'; then
+        STALE=1
+        continue
+      fi
+      STALE=0
+      break
+      ;;
   esac
 done
+
+if [ "${STALE:-0}" = "1" ]; then
+  echo "[!] 컴파일 결과를 판정하지 못했습니다 (실패 표시인데 에러 목록이 비어 있음 — 이전 결과로 보임)."
+  echo "    다시 실행해 보세요. 반복되면 에디터 콘솔을 직접 확인하세요. (ISSUE-010)"
+  exit 3
+fi
 
 if [ -z "$STATUS" ]; then
   echo "[!] recompile_status 를 읽지 못했습니다."

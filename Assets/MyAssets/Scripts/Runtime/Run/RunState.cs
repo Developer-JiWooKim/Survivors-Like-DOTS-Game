@@ -19,5 +19,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Run
     public struct RunState : IComponentData
     {
         public RunPhase Phase;
+
+        /// <summary>
+        /// 런 경과 시간 (초). <see cref="RunClockSystem"/> 이 게임플레이 그룹 안에서 올리므로
+        /// 레벨업 일시정지·게임오버 동안에는 흐르지 않는다.
+        /// </summary>
+        public float ElapsedSeconds;
     }
 }

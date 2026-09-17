@@ -1,3 +1,5 @@
+using Assets.MyAssets.Scripts.Runtime.Weapon;
+
 namespace Assets.MyAssets.Scripts.Runtime.Leveling
 {
     /// <summary>
@@ -6,11 +8,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
     /// </summary>
     public enum UpgradeType : byte
     {
+        // 수치 강화
         ShardDamage,
         ShardFireRate,
         ShardProjectileSpeed,
         MoveSpeed,
         MaxHealth,
+
+        // 발사 형태 강화 (2026-09-17 추가 — "화력을 퍼붓는 맛")
+        TargetCount,
+        ProjectileCount,
+        Spread,
+        Pierce,
+        Explosion,
     }
 
     /// <summary>
@@ -18,7 +28,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
     /// </summary>
     public static class UpgradeTable
     {
-        public const int Count = 5;
+        public const int Count = 10;
 
         /// <summary>파편탄 피해 배율 (+20%).</summary>
         public const float ShardDamageMultiplier = 1.2f;
@@ -34,5 +44,40 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
 
         /// <summary>최대 체력 증가량. 늘어난 만큼 현재 체력도 회복한다.</summary>
         public const float MaxHealthBonus = 20f;
+
+        public const int MaxTargetCount = 12;
+        public const int MaxProjectilesPerTarget = 7;
+
+        public const float SpreadStepDegrees = 15f;
+        public const float MaxSpreadDegrees = 90f;
+
+        /// <summary>관통 상한. <c>Projectile.HitHistory</c>(15 칸)에 여유를 두고 정했다.</summary>
+        public const int MaxPierce = 10;
+
+        /// <summary>폭발을 처음 고르면 이 반경으로 해금된다.</summary>
+        public const float ExplosionUnlockRadius = 1f;
+        public const float ExplosionRadiusStep = 0.5f;
+
+        /// <summary>
+        /// 폭발 반경 상한. 반경이 커질수록 조회 셀이 제곱으로 늘어난다 (3.0 → 9×9 = 81 칸).
+        /// </summary>
+        public const float MaxExplosionRadius = 3f;
+
+        /// <summary>
+        /// 이미 최대치라 더 고를 의미가 없는 선택지인지. 레벨업 후보에서 뺀다.
+        /// 수치 강화 5 종은 상한이 없어 항상 후보이므로, 후보가 3 개 미만이 되는 일은 없다.
+        /// </summary>
+        public static bool IsMaxed(UpgradeType upgrade, in ShardWeapon weapon)
+        {
+            return upgrade switch
+            {
+                UpgradeType.TargetCount => weapon.TargetCount >= MaxTargetCount,
+                UpgradeType.ProjectileCount => weapon.ProjectilesPerTarget >= MaxProjectilesPerTarget,
+                UpgradeType.Spread => weapon.SpreadDegrees >= MaxSpreadDegrees,
+                UpgradeType.Pierce => weapon.Pierce >= MaxPierce,
+                UpgradeType.Explosion => weapon.ExplosionRadius >= MaxExplosionRadius,
+                _ => false,
+            };
+        }
     }
 }

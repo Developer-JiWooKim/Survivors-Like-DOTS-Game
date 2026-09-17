@@ -76,6 +76,43 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
                     movement.ValueRW.Speed *= UpgradeTable.MoveSpeedMultiplier;
                     break;
                 }
+                case UpgradeType.TargetCount:
+                {
+                    RefRW<ShardWeapon> weapon = SystemAPI.GetComponentRW<ShardWeapon>(player);
+                    weapon.ValueRW.TargetCount = math.min(weapon.ValueRO.TargetCount + 1, UpgradeTable.MaxTargetCount);
+                    break;
+                }
+                case UpgradeType.ProjectileCount:
+                {
+                    RefRW<ShardWeapon> weapon = SystemAPI.GetComponentRW<ShardWeapon>(player);
+                    weapon.ValueRW.ProjectilesPerTarget =
+                        math.min(weapon.ValueRO.ProjectilesPerTarget + 1, UpgradeTable.MaxProjectilesPerTarget);
+                    break;
+                }
+                case UpgradeType.Spread:
+                {
+                    RefRW<ShardWeapon> weapon = SystemAPI.GetComponentRW<ShardWeapon>(player);
+                    weapon.ValueRW.SpreadDegrees =
+                        math.min(weapon.ValueRO.SpreadDegrees + UpgradeTable.SpreadStepDegrees, UpgradeTable.MaxSpreadDegrees);
+                    break;
+                }
+                case UpgradeType.Pierce:
+                {
+                    RefRW<ShardWeapon> weapon = SystemAPI.GetComponentRW<ShardWeapon>(player);
+                    weapon.ValueRW.Pierce = math.min(weapon.ValueRO.Pierce + 1, UpgradeTable.MaxPierce);
+                    break;
+                }
+                case UpgradeType.Explosion:
+                {
+                    // 처음 고르면 해금, 이후로는 반경 증가
+                    RefRW<ShardWeapon> weapon = SystemAPI.GetComponentRW<ShardWeapon>(player);
+                    float radius = weapon.ValueRO.ExplosionRadius;
+                    radius = radius <= 0f
+                        ? UpgradeTable.ExplosionUnlockRadius
+                        : math.min(radius + UpgradeTable.ExplosionRadiusStep, UpgradeTable.MaxExplosionRadius);
+                    weapon.ValueRW.ExplosionRadius = radius;
+                    break;
+                }
                 case UpgradeType.MaxHealth:
                 {
                     RefRW<Health> health = SystemAPI.GetComponentRW<Health>(player);
