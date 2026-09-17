@@ -29,6 +29,7 @@ Unity 6 DOTS 2D 뱀서라이크 — **발생한 이슈와 대응** 기록.
 | [006](#issue-006) | 2026-09-16 | M1 | DOTS | `ChaseJob` 완료 전 메인 스레드가 `LocalTransform` 읽어 예외 6,110건 | ✅ 해결 | 2026-09-16 |
 | [007](#issue-007) | 2026-09-16 | M1 | 툴링 | `unity-recompile.sh` 가 `up_to_date` 상태를 실패로 오판 | ✅ 해결 | 2026-09-16 |
 | [008](#issue-008) | 2026-09-17 | M1 | 툴링 | 머티리얼 빌더 재실행 시 사용자가 바꾼 `EnemyQuad` 색을 덮어씀 | ✅ 해결 | 2026-09-17 |
+| [009](#issue-009) | 2026-09-17 | M1 | DOTS | UI 에서 `SetSingleton` 호출 시 "access is not read-write" 예외 | ✅ 해결 | 2026-09-17 |
 
 > 분류: `DOTS` / `성능` / `렌더링` / `빌드` / `툴링` / `Unity` / `게임로직` / `기타`
 
@@ -531,3 +532,55 @@ LocalTransform playerTransform = _playerQuery.GetSingleton<LocalTransform>();
 
 - 에셋 빌더는 **"코드가 소유하는 속성"과 "사람이 조정하는 속성"을 구분**한다. 후자는 생성 시에만 쓴다.
 - 에디터 명령을 실행한 뒤에는 `git status` 로 **의도하지 않은 에셋 변경이 없는지** 확인한다.
+
+---
+
+### ISSUE-009
+
+| | |
+|---|---|
+| **발생일시** | 2026-09-17 |
+| **마일스톤** | M1 |
+| **분류** | DOTS |
+| **상태** | ✅ 해결 |
+| **해결일** | 2026-09-17 |
+| **관련 작업** | [WorkLog 2026-09-17 (5) XP·레벨업·UI](WorkLog.md) |
+
+**증상**
+
+레벨업 패널의 선택지 버튼을 누르자 예외가 나고 게임이 재개되지 않았다 (사용자 보고). 패널 표시·선택지 3 개 표시까지는 정상.
+
+```
+InvalidOperationException: Can't call GetSingletonRW<Assets.MyAssets.Scripts.Runtime.Leveling.LevelUpState>()
+on query where access to Assets.MyAssets.Scripts.Runtime.Leveling.LevelUpState is not read-write.
+  Unity.Entities.EntityQueryImpl.GetSingletonRW[T] () (EntityQuery.cs:1448)
+  Unity.Entities.EntityQueryImpl.SetSingleton[T] (T value) (EntityQuery.cs:1570)
+  Assets.MyAssets.Scripts.Runtime.UI.SingletonAccess`1[T].TryWrite (T value) (SingletonAccess.cs:35)
+  Assets.MyAssets.Scripts.Runtime.UI.LevelUpPanelView.Select (System.Int32 index) (LevelUpPanelView.cs:77)
+```
+
+**재현 조건**
+
+항상. UI 에서 `SingletonAccess<T>.TryWrite` 를 호출할 때.
+
+**원인**
+
+`SingletonAccess<T>` 가 쿼리를 `EntityQueryBuilder.WithAll<T>()` 로 만들었다.
+`WithAll` 은 **읽기 전용** 접근으로 등록되고, `SetSingleton` 은 내부에서 `GetSingletonRW` 를 거치며 쿼리의 접근 권한이 read-write 인지 검사한다.
+읽기(TryRead)만 먼저 동작을 확인하고 쓰기 경로는 실행해 보지 않은 채 넘겼다.
+
+**시도한 것**
+
+| 시도 | 결과 |
+|---|---|
+| 스택 트레이스로 `SingletonAccess.cs:35` (`SetSingleton`) 특정 | 원인 확인 |
+| `WithAll<T>()` → `WithAllRW<T>()` | ✅ 사용자 재확인 — 선택 → 강화 적용 → 재개 정상 |
+
+**해결**
+
+도우미가 읽기·쓰기를 모두 하므로 쿼리를 RW 로 생성. RW 쿼리에서도 `TryGetSingleton`(읽기)은 그대로 동작한다.
+
+**재발 방지**
+
+- `EntityQueryBuilder` 의 `WithAll` / `WithAllRW` 는 **쿼리의 접근 권한**을 정한다. 쓰기 API(`SetSingleton`, `GetSingletonRW`)를 부를 쿼리는 RW 로 만든다.
+- 이 프로젝트의 시스템 코드는 대부분 `SystemAPI` 로 싱글턴을 써서 이 권한을 신경 쓸 일이 없었다. **MonoBehaviour 에서 만드는 수동 쿼리**가 함정 지점이다 (`IncludeSystems` 누락과 같은 부류, WorkLog (5) 결정 7).

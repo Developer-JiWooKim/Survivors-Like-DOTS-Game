@@ -1,5 +1,6 @@
 using Assets.MyAssets.Scripts.Runtime.Combat;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Assets.MyAssets.Scripts.Runtime.Player
@@ -38,6 +39,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Player
                 });
 
                 AddComponent(entity, new HitRadius { Value = authoring._hitRadius });
+
+                AddComponent(entity, PlayerExperience.Initial);
+
+                // 첫 프레임 이동 전에도 올바른 값이 있도록 배치 위치로 초기화한다.
+                // Baker.GetComponent 를 거쳐야 트랜스폼이 바뀔 때 재베이킹 의존성이 잡힌다.
+                Vector3 start = GetComponent<Transform>().position;
+                AddComponent(entity, new PlayerPosition { Value = new float2(start.x, start.y) });
             }
         }
     }

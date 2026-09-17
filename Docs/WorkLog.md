@@ -15,8 +15,8 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 | | |
 |---|---|
 | **마일스톤** | **M1 진행 중** (M0 완료) |
-| **최근 작업** | 투사체 충돌·최근접 탐색 해시 조회 교체 **완료** (2026-09-17). 적 1,000 에서 PlayerLoop 1.88 → 1.5~1.8 ms (소폭) |
-| **다음 작업** | ① 커밋 (사용자)<br>② XP 젬 + 레벨업 UI (+ HP 바 여부 미정)<br>📝 빌드 실측 때: 에디터 스파이크(EditorLoop 210 ms) 소멸 확인, PerfOverlay 의 GC·4 Hz 동기화 영향 확인<br>⏸ 대시 보류 |
+| **최근 작업** | XP 젬 + 레벨업 3지선다 + HP/XP 바 (uGUI) **완료** (2026-09-17) → **M1 기능 전부 완료** (대시 보류 제외) |
+| **다음 작업** | ① 커밋 (사용자)<br>② M1 게이트 정리 (적 1,000 기본 루프 확인·측정) → M2 벤치 (적 1만 @60fps, 렌더 절반은 사용자 실측)<br>📝 빌드 실측 때: 에디터 스파이크 소멸, PerfOverlay GC·4 Hz 동기화 영향 확인<br>📝 후속: 피격 피드백(플래시), 한글 폰트, 대시 |
 | **미해결 이슈** | [ISSUE-002](IssueLog.md#issue-002) ⚠️ (재현 안 됨), [ISSUE-005](IssueLog.md#issue-005) ⏳ (M2로 의도적 보류) |
 
 **M1 체크리스트**
@@ -26,7 +26,7 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 ✅ 파편탄 자동 발사 + 적 피격/사망 (enableable 풀링)
 ✅ 플레이어 피격/사망 + RunState 게이트  (피격 피드백은 미구현)
 ⏸ 대시 (쿨 3초, 0.15초 무적)  ← 보류 (2026-09-17 사용자 결정)
-⬜ XP 젬 + 레벨업 UI
+✅ XP 젬 + 레벨업 UI + HP/XP 바 (uGUI)
 
 [M2 에서 앞당김]
 ✅ 적 공간 해시 (MultiHashMap, 셀 1.0) + 분리  ← 사용자 확인 (적 500, 겹침 감소·떨림 없음)
@@ -70,9 +70,106 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 
 ---
 
+## 2026-09-17 (5) — [M1] XP 젬 + 레벨업 3지선다 + HP/XP 바 (uGUI) ✅
+
+**커밋** `(미커밋)` | **관련 이슈** 없음
+
+> 상태: 코드 + 컴파일 + 사용자 씬·UI 구성 + 플레이 확인 완료. **M1 기능 완료 (대시 보류 제외).**
+
+### 한 일
+
+| 폴더 | 파일 | 역할 |
+|---|---|---|
+| `Player/` | `PlayerExperience.cs` | 레벨·경험치·다음 필요량 (`5 + level × 8`, 기획서 7.1) |
+| | `PlayerPosition.cs` | 플레이어 위치 사본 — 잡이 기다림·에일리어싱 없이 읽기 위함 |
+| | `PlayerMoveSystem.cs`, `PlayerAuthoring.cs` (수정) | 사본 갱신 / 두 컴포넌트 베이킹 |
+| `Experience/` | `XpGem.cs`, `XpGemAuthoring.cs` | 젬 (값·흡인 여부·속도) |
+| | `XpGemPool.cs`, `XpGemPoolAuthoring.cs`, `XpGemPoolSystem.cs` | 풀 4,000 + 수집 설정 |
+| | `XpDropBus.cs` | 사망 → 드랍 요청 스트림 버스 |
+| | `XpGemSpawnSystem.cs` | 요청마다 빈 젬 배치, 풀이 비면 **가장 먼 젬에 합치기** (단일 잡) |
+| | `XpCollectSystem.cs` | 자석 흡인 + 수집 (병렬) → 합계를 경험치에 더함 (단일 잡) |
+| `Enemy/` | `EnemyDeathSystem.cs` (수정) | 사망 시 소형 젬 드랍 요청을 스트림에 기록 |
+| `Leveling/` | `UpgradeType.cs` | 강화 5 종 + 수치 표 |
+| | `LevelUpState.cs` | 3지선다 상태 싱글턴 — **ECS ↔ UI 의 유일한 창구** |
+| | `LevelUpSystem.cs` | 게임플레이 그룹 맨 앞: 필요량 도달 → 레벨업, 무작위 3 개, `Paused` |
+| | `LevelUpApplySystem.cs` | 게임플레이 그룹 **밖**: 선택 적용 → `Playing` |
+| `UI/` | `PlayerStatusView.cs`, `PlayerStatusViewSystem.cs` | UI 용 체력·경험치 사본 (프레임 시작에 복사) |
+| | `SingletonAccess.cs` | MonoBehaviour 에서 시스템 엔티티 싱글턴 읽기/쓰기 (`IncludeSystems`) |
+| | `ExperienceBarView.cs` | 상단 XP 바 + 레벨 |
+| | `PlayerHealthBarView.cs` | 머리 위 HP 바 (Overlay 캔버스, 화면 좌표 추적) |
+| | `LevelUpPanelView.cs` | 3지선다 패널 |
+| | `Survivors.Runtime.asmdef` (수정) | `UnityEngine.UI`, `Unity.TextMeshPro` 참조 |
+| `Materials/` | `XpGemQuad.mat` (신규) | 녹색. CLI 로 생성 — 기존 머티리얼 무변경 확인 (ISSUE-008 수정 검증) |
+
+**순서**
+```
+SimulationSystemGroup
+├ LevelUpApplySystem          (Paused 중에도 돎)
+├ PlayerStatusViewSystem      (Paused 중에도 돎)
+└ GameplaySystemGroup  (Playing 일 때만)
+   PlayerDeath → LevelUp (OrderFirst) → … → DamageApply → EnemyDeath → XpGemSpawn → XpCollect
+```
+
+### 왜 이렇게 했나
+
+**1. UI = uGUI** (사용자 결정, 프로젝트 전역) — UI Toolkit 은 다른 프로젝트에서 충분히 써봤다. 기획서 11장 미결 4 번에 대한 답.
+
+**2. 드랍 = 항상 소형 1 개** (사용자 결정) — 적 1 종뿐인 M1 에 확률표는 과함. 젬 종류는 따로 두지 않고 **값(Value)** 으로 표현 → 합치기와 자연스럽게 맞물린다.
+
+**3. 풀이 가득 차면 가장 먼 젬에 합치기** (사용자 결정 — 추천안(버리기)과 다르게 감)
+- 경험치 손실이 없다. "가장 먼 젬" 은 풀이 바닥난 **프레임에 한 번만** 계산하고, 그 프레임 넘친 요청을 전부 몰아준다 — 드랍마다 다시 찾으면 O(드랍 × 젬).
+- 배정은 **단일 잡**. 사망 잡(병렬)이 직접 빈 젬을 켜면 여러 워커가 같은 젬을 고르는 레이스.
+
+**4. `PlayerPosition` 사본 도입**
+- 젬 흡인 잡은 젬의 `LocalTransform` 에 **쓴다**. 같은 잡에서 플레이어 `LocalTransform` 을 룩업(읽기)하면 같은 타입 읽기+쓰기라 안전 검사에 걸린다.
+- 메인 스레드에서 `LocalTransform` 을 읽으면 적 이동 잡을 기다린다. 사본은 메인 스레드에서만 쓰므로 기다릴 잡이 없다.
+
+**5. 레벨업 — 판정·적용 분리, UI 는 "무엇을 골랐나" 만**
+- 판정(`LevelUpSystem`)은 게임플레이 그룹 맨 앞, **지난 프레임** 경험치로 — 합산 잡이 끝나 있어 대기 없음 (`PlayerDeathSystem` 과 같은 패턴).
+- 적용(`LevelUpApplySystem`)은 그룹 **밖** — Paused 동안 그룹이 멈춰 있으므로, 안에 두면 영원히 재개되지 않는다.
+- UI 는 `SelectedIndex` 만 기록. 플레이어 컴포넌트 쓰기를 ECS 한 곳에 모아 적용 순서·동기화를 통제.
+- 한 번에 1 레벨만. 두 레벨 분량이면 재개 다음 프레임에 다시 걸린다 → "남은 레벨업 수" 상태가 필요 없다.
+- 선택지: 5 종 중 3 개를 부분 Fisher–Yates 로. 시드는 시계 (고정 시드면 매 판 같은 순서).
+
+**6. UI 데이터는 사본 싱글턴으로** (`PlayerStatusView`)
+- `Health` 는 피해 적용 잡이 쓴다. MonoBehaviour 가 직접 읽으면 매 프레임 잡 체인 전체를 기다린다.
+- 프레임 시작(그룹 밖)에 복사 — Paused 중에도 갱신돼야 최대 체력 강화가 즉시 보인다. 대가는 1 프레임 늦은 표시.
+- **예외 — HP 바의 위치**는 이번 프레임 `LocalTransform` 을 쓴다. 카메라가 이번 프레임을 따라가므로 바만 늦으면 이동 중 뒤처져 보인다. `CameraFollow` 가 같은 프레임에 이미 동기화했으므로 추가 대기 없음. 실행 순서도 카메라 뒤(`DefaultExecutionOrder(100)`).
+
+**7. `SingletonAccess<T>` — 시스템 엔티티 함정**
+- UI 싱글턴들은 소유 시스템의 **시스템 엔티티**에 붙어 있다. `SystemAPI` 는 자동 포함하지만, 직접 만든 `EntityQuery` 는 `EntityQueryOptions.IncludeSystems` 없이는 **못 찾는다** (패키지 소스 `EntityQuery.cs` 의 GetSingleton 주석으로 확인).
+
+**8. 라벨이 영어** — TMP 기본 폰트(LiberationSans)에 한글 글리프가 없다. 한글 폰트 에셋을 들이면 `LevelUpPanelView.Describe` 만 바꾸면 된다.
+
+**9. 바 채우기 = 앵커 조정** (`UiBar.cs`)
+- 처음엔 `Image.fillAmount`(Filled 타입)로 작성했으나, 씬 구성 절차를 쓰다가 **Filled 는 Source Image(스프라이트)가 있어야 동작**한다는 점에 걸려 교체.
+- 단색 프로토타입(기획서 9장)이라 스프라이트 없는 Image 를 쓴다 → 채움 RectTransform 의 `anchorMax.x` 를 비율로 옮기는 방식이 설정 실수가 적다.
+
+**10. 빌드 중 막힌 것**
+- `SystemAPI` 를 `static` 메서드에서 호출 → `EA0006` (소스 생성기가 인스턴스의 타입 핸들을 참조). 인스턴스 메서드로 변경.
+
+**수치** (기획서에 없음 → 사용자 승인. 흡인 가속도 24 u/s² 는 제안 시 "가속" 으로만 적었던 값)
+
+| 항목 | 값 |
+|---|---|
+| 젬 풀 | 4,000 (가득 차면 가장 먼 젬에 합침) |
+| 자석 반경 / 수집 반경 | 2.5 / 0.5 |
+| 흡인 시작 속도 / 가속도 | 12 u/s / 24 u/s² |
+| 강화 | 피해 +20% / 발사 간격 ×0.85 / 탄속 +20% / 이동속도 +10% / 최대 HP +20 (그만큼 회복) |
+| 레벨업 필요량 | `5 + level × 8` (기획서) — Lv1→2 는 13 |
+
+### 검증
+- `bash Tools/unity-recompile.sh` → **컴파일 성공**, 프로젝트 경고 없음
+- **플레이 1 차 (사용자)**: 젬 드랍 ✅ / 흡인·수집 ✅ / XP 바 증가 ✅ / 레벨업 로그 `[LevelUp] Lv.2 — 선택 대기` + 패널·선택지 3 개 표시 ✅
+  → **버튼 클릭 시 예외** ([ISSUE-009](IssueLog.md#issue-009)) — `SingletonAccess` 쿼리가 읽기 전용이었음. `WithAllRW` 로 수정, 컴파일 통과
+- **플레이 2 차 (사용자)**: 선택 → 강화 적용 → 재개 ✅ / HP 바 ✅ → ISSUE-009 해결
+- **사용자 조정**: 플레이어 스케일 2 → **1** (보이는 반경 1.0 → 0.5). 판정 반경 0.4 는 그대로 — 보이는 크기보다 약간 작은 "관대한 판정" 이 됐다 (이전엔 보이는 크기의 40%)
+
+---
+
 ## 2026-09-17 (4) — [M1→M2 선행] 투사체 충돌·최근접 탐색을 해시 조회로 교체 ✅
 
-**커밋** `(미커밋)` — 교체 전 코드는 `9ac3060` | **관련 이슈** 없음
+**커밋** `6f15fa4` — 교체 전 코드는 `9ac3060` | **관련 이슈** 없음
 
 > 상태: 코드 + 컴파일 + 사용자 동작 확인 + 평상 프레임 측정 완료. PlayerLoop 1.88 → 1.5~1.8 ms (소폭, 오차 범위와 겹침).
 
@@ -149,7 +246,7 @@ Unity 6 DOTS 2D 뱀서라이크 — **날짜별 작업 내용** 기록.
 
 ## 2026-09-17 (3) — [M1→M2 선행] 적 공간 해시 + 적끼리 분리 ✅
 
-**커밋** `(미커밋)` | **관련 이슈** 없음
+**커밋** `9ac3060` | **관련 이슈** 없음
 
 > 상태: 코드 + 컴파일 + 사용자 플레이 확인 완료 (적 500).
 > **마일스톤 순서 변경**: 사용자 요청으로 대시를 보류하고, M2 핵심 작업인 공간 해시·분리를 M1 도중에 앞당겼다.
@@ -265,7 +362,7 @@ dir   = chase + push × 1.5,  길이 1 로 상한
 
 ## 2026-09-17 (2) — [M1] 플레이어 피격/사망 + RunState 게이트 ✅
 
-**커밋** `(미커밋)` | **관련 이슈** 없음
+**커밋** `9ac3060` | **관련 이슈** 없음
 
 > 상태: 코드 + 컴파일 + 사용자 플레이 확인 완료. 피격은 **사망으로 간접 확인** (피격 피드백 없음).
 

@@ -10,7 +10,9 @@
         "Unity.Burst",
         "Unity.Mathematics",
         "Unity.Scenes",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

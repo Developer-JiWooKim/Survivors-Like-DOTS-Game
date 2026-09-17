@@ -33,6 +33,9 @@ namespace Assets.MyAssets.Scripts.Editor
             // 기획서 9장: 투사체 = 작은 흰 도형. 플레이어보다 약간 푸르게 해 겹쳐도 구분되게 한다.
             Create("ProjectileQuad", new Color(0.85f, 0.95f, 1f, 1f));
 
+            // 기획서에 젬 색 지정은 없다. 적(파랑)·투사체(흰색)와 구분되는 녹색.
+            Create("XpGemQuad", new Color(0.3f, 0.95f, 0.45f, 1f));
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
