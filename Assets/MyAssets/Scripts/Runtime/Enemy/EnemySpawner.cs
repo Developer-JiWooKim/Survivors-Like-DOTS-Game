@@ -76,6 +76,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         /// </summary>
         public int FixedTarget;
 
+        /// <summary>
+        /// 벤치마크 모드. 고정 목표 수가 켜져 있으면 함께 켜진다 — 옵션을 하나로 묶어 실수로 한쪽만 켜 두는 일을 막는다.
+        /// 켜지면 플레이어가 죽지 않고(체력 바닥 시 최대치로 복구), 레벨업 일시정지가 뜨지 않는다.
+        /// 전투·사망·젬·재스폰은 그대로 돌아 실제 플레이에 가까운 부하로 잰다.
+        /// </summary>
+        public bool IsBenchmark => FixedTarget > 0;
+
         public int BudgetAt(float elapsedSeconds)
         {
             if (FixedTarget > 0)

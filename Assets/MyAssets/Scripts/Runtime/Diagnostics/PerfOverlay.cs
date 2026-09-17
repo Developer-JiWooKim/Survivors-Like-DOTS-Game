@@ -115,6 +115,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
 
             if (_director.TryRead(out SpawnDirector director))
             {
+                // 벤치마크 모드는 무적·레벨업 없음이라, 켜진 채 플레이하면 헷갈린다. 눈에 띄게 표시한다.
+                // 영어인 이유: IMGUI 기본 폰트에 한글 글리프가 없을 수 있다.
+                if (director.IsBenchmark)
+                {
+                    _text.Append("[BENCH] god mode, no level-up\n");
+                }
+
                 _text.AppendFormat("Enemy {0,6}/{1}\n", director.Alive, director.Target);
                 _text.AppendFormat("E.HP  {0,7:F1}\n", director.SpawnHealth);
             }
@@ -196,8 +203,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Diagnostics
                 normal = { textColor = Color.white },
             };
 
-            const int width = 220;
-            const int height = 216; // 줄 추가(Time, Enemy, E.HP)에 맞춰 늘림
+            const int height = 236; // 줄 추가(Time, BENCH, Enemy, E.HP)에 맞춰 늘림
+            const int width = 260;
             var rect = new Rect(10f, 10f, width, height);
 
             // 배경을 깔지 않으면 밝은 화면에서 글자가 안 보인다.

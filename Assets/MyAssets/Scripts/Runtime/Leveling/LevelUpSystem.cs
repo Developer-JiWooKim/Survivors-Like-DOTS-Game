@@ -1,3 +1,4 @@
+using Assets.MyAssets.Scripts.Runtime.Enemy;
 using Assets.MyAssets.Scripts.Runtime.Player;
 using Assets.MyAssets.Scripts.Runtime.Run;
 using Assets.MyAssets.Scripts.Runtime.Weapon;
@@ -49,6 +50,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Leveling
 
             // 같은 프레임에 사망 판정이 먼저 났으면 레벨업을 띄우지 않는다.
             if (runState.ValueRO.Phase != RunPhase.Playing)
+            {
+                return;
+            }
+
+            // 벤치마크 모드: 레벨업 창으로 멈추지 않는다. 경험치는 계속 쌓이기만 한다.
+            if (SystemAPI.TryGetSingleton(out SpawnDirector director) && director.IsBenchmark)
             {
                 return;
             }

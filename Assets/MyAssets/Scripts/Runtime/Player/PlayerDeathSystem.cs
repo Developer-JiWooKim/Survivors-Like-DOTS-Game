@@ -1,4 +1,5 @@
 using Assets.MyAssets.Scripts.Runtime.Combat;
+using Assets.MyAssets.Scripts.Runtime.Enemy;
 using Assets.MyAssets.Scripts.Runtime.Run;
 using Unity.Burst;
 using Unity.Entities;
@@ -29,10 +30,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Player
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            foreach (RefRO<Health> health in SystemAPI.Query<RefRO<Health>>().WithAll<PlayerMovement>())
+            bool benchmark = SystemAPI.TryGetSingleton(out SpawnDirector director) && director.IsBenchmark;
+
+            foreach (RefRW<Health> health in SystemAPI.Query<RefRW<Health>>().WithAll<PlayerMovement>())
             {
                 if (health.ValueRO.Current > 0f)
                 {
+                    continue;
+                }
+
+                // 벤치마크 모드: 죽지 않고 체력을 채운다. 게임오버로 게임플레이가 멈추면 측정이 무의미해진다.
+                if (benchmark)
+                {
+                    health.ValueRW.Current = health.ValueRO.Max;
                     continue;
                 }
 
