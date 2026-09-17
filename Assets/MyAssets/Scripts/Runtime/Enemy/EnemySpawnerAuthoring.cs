@@ -32,6 +32,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         [Tooltip("테스트 전용: 목표 수 계산에만 곱하는 시간 배율. 10 이면 2 분에 20 분 시점의 적 수. 평소 1")]
         [SerializeField] private float _testTimeScale = 1f;
 
+        [Tooltip("벤치마크 전용: 0 보다 크면 시간과 무관하게 적 수를 이 값으로 고정한다. 평소 0")]
+        [SerializeField] private int _benchmarkFixedTarget;
+
         [Header("레벨 비례 체력")]
         [Tooltip("플레이어 레벨당 스폰 체력 배율. 체력 = 프리팹 체력 × 배율^(Lv-1). 새로 스폰되는 적에만 적용")]
         [SerializeField] private float _healthGrowthPerLevel = 1.1f;
@@ -74,6 +77,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                     GrowthPerMinute = authoring._growthPerMinute,
                     TestTimeScale = Mathf.Max(0f, authoring._testTimeScale),
                     HealthGrowthPerLevel = Mathf.Max(1f, authoring._healthGrowthPerLevel),
+                    FixedTarget = Mathf.Max(0, authoring._benchmarkFixedTarget),
                 });
 
                 // 적 관련 전역 설정이라 스포너에 함께 둔다. 씬 오브젝트를 하나 더 만들 필요가 없다.

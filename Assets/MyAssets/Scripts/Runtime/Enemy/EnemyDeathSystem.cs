@@ -7,13 +7,15 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
+using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
+using Random = Unity.Mathematics.Random;
 
 namespace Assets.MyAssets.Scripts.Runtime.Enemy
 {
     /// <summary>
-    /// 체력이 바닥난 적을 풀로 돌려보내고 XP 젬 드랍을 요청한다 (기획서 8.2 의 17번). 파괴하지 않고 Active 만 끈다.
+    /// 체력이 바닥난 적을 풀로 돌려보내고 XP 젬 드랍(+ 낮은 확률로 자석)을 요청한다 (기획서 8.2 의 17번). 파괴하지 않고 Active 만 끈다.
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(GameplaySystemGroup))]
@@ -21,6 +23,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     public partial struct EnemyDeathSystem : ISystem
     {
         private EntityQuery _query;
+        private uint _frame;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -41,9 +44,14 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         {
             var drops = new NativeStream(_query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
 
+            // 자석 설정이 없는 씬(벤치마크 등)에서도 돌도록 확률 0 으로 둔다.
+            float magnetChance = SystemAPI.TryGetSingleton(out MagnetDropSettings magnet) ? magnet.DropChance : 0f;
+
             JobHandle handle = new EnemyDeathJob
             {
                 Drops = drops.AsWriter(),
+                MagnetChance = magnetChance,
+                Seed = math.hash(new uint2(0x9E3779B9u, ++_frame)),
             }.ScheduleParallel(_query, state.Dependency);
 
             // 스트림 해제는 XpGemSpawnSystem 의 몫이다.
@@ -56,6 +64,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     internal partial struct EnemyDeathJob : IJobEntity, IJobEntityChunkBeginEnd
     {
         public NativeStream.Writer Drops;
+        public float MagnetChance;
+        public uint Seed;
 
         public bool OnChunkBegin(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
@@ -68,7 +78,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             Drops.EndForEachIndex();
         }
 
-        private void Execute(in Health health, in LocalTransform transform, EnabledRefRW<Active> active, EnabledRefRW<MaterialMeshInfo> visible)
+        private void Execute(
+            Entity entity,
+            in Health health,
+            in LocalTransform transform,
+            EnabledRefRW<Active> active,
+            EnabledRefRW<MaterialMeshInfo> visible)
         {
             if (health.Current > 0f)
             {
@@ -82,8 +97,25 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             Drops.Write(new XpDrop
             {
                 Position = transform.Position.xy,
+                Kind = XpDropKind.Gem,
                 Value = XpGem.SmallValue,
             });
+
+            if (MagnetChance <= 0f)
+            {
+                return;
+            }
+
+            // 워커 간에 Random 을 공유하면 레이스. 엔티티마다 결정적으로 만든다 (프레임 시드 × 엔티티 번호).
+            var random = Random.CreateFromIndex(math.hash(new uint2(Seed, (uint)entity.Index)));
+            if (random.NextFloat() < MagnetChance)
+            {
+                Drops.Write(new XpDrop
+                {
+                    Position = transform.Position.xy,
+                    Kind = XpDropKind.Magnet,
+                });
+            }
         }
     }
 }

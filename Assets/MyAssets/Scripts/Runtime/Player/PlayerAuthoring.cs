@@ -19,6 +19,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Player
         [Tooltip("피격 판정 반경 (월드 유닛). 기획서에 없는 M1 임시값")]
         [SerializeField] private float _hitRadius = 0.4f;
 
+        [Tooltip("피격 후 무적 시간 (초). 기획서 3 장 0.5")]
+        [SerializeField] private float _hitInvulnerability = 0.5f;
+
         private sealed class PlayerBaker : Baker<PlayerAuthoring>
         {
             public override void Bake(PlayerAuthoring authoring)
@@ -39,6 +42,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Player
                 });
 
                 AddComponent(entity, new HitRadius { Value = authoring._hitRadius });
+                AddComponent(entity, new HitInvulnerability { Duration = authoring._hitInvulnerability });
 
                 AddComponent(entity, PlayerExperience.Initial);
 

@@ -201,6 +201,9 @@ MonoBehaviour:
   _pickupRadius: 0.5
   _attractStartSpeed: 12
   _attractAcceleration: 24
+  _magnetPrefab: {fileID: 7826053823481357725, guid: 2033e820e021c2a48a552777b2b9111c, type: 3}
+  _magnetPoolSize: 16
+  _magnetDropChance: 0.05
 --- !u!4 &1241734400
 Transform:
   m_ObjectHideFlags: 0
@@ -251,6 +254,7 @@ MonoBehaviour:
   _speed: 5
   _maxHealth: 100
   _hitRadius: 0.4
+  _hitInvulnerability: 0.5
 --- !u!23 &1339508079
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -427,6 +431,8 @@ MonoBehaviour:
   _baseBudget: 50
   _growthPerMinute: 1.28
   _testTimeScale: 10
+  _benchmarkFixedTarget: 0
+  _healthGrowthPerLevel: 1.1
   _separationStrength: 1.5
   _separationMaxNeighbors: 16
   _randomSeed: 1

@@ -109,7 +109,8 @@ Claude는 Unity 배치모드 CLI로 **컴파일과 테스트를 직접 검증한
 |---|---|---|---|
 | `bash Tools/unity-recompile.sh` | **켜져 있어야 함** | 빠름 | **기본값.** 컴파일 검증 |
 | `bash Tools/unity-check.sh` | **닫혀 있어야 함** | 느림 | 위가 안 될 때 |
-| `bash Tools/unity-test.sh EditMode` | 닫혀 있어야 함 | 느림 | 테스트 실행 |
+| `unity command run_tests --mode editor --filter_type assembly --filter Survivors.Tests` | **켜져 있어야 함** | 빠름 | **테스트 기본값** |
+| `bash Tools/unity-test.sh EditMode` | 닫혀 있어야 함 | 느림 | 위가 안 될 때 테스트 실행 |
 
 - `unity-recompile.sh` 는 `com.unity.pipeline` 을 통해 **실행 중인 에디터에 재컴파일을 명령**한다. 에디터를 닫으라고 요청할 필요가 없다.
 - `unity-check.sh` 진입점: `Assets/MyAssets/Scripts/Editor/CI.cs`
@@ -189,7 +190,7 @@ grep -a "Exception" "$L" | sort -u | head     # 종류
   |---|---|---|---|
   | `Survivors.Editor` | `Scripts/Editor/` | `Assets.MyAssets.Scripts.Editor` | 생성 완료 (CLI 진입점) |
   | `Survivors.Runtime` | `Scripts/Runtime/` | `Assets.MyAssets.Scripts.Runtime` | 생성 완료 |
-  | `Survivors.Tests` | `Scripts/Tests/` | `Assets.MyAssets.Scripts.Tests` | 필요 시점에 생성 |
+  | `Survivors.Tests` | `Scripts/Tests/` | `Assets.MyAssets.Scripts.Tests` | 생성 완료 (EditMode, 공간 해시 조회) |
 
   **어셈블리명과 네임스페이스는 일부러 다르다.**
   - 어셈블리명은 **프로젝트 전역에서 유일해야 하고** `.csproj` 파일명으로도 쓰인다. 짧고 고유한 게 낫다.

@@ -5,10 +5,21 @@ using Unity.Mathematics;
 
 namespace Assets.MyAssets.Scripts.Runtime.Experience
 {
-    /// <summary>젬 하나를 떨어뜨리라는 요청.</summary>
+    public enum XpDropKind : byte
+    {
+        Gem,
+        Magnet,
+    }
+
+    /// <summary>
+    /// 바닥에 아이템 하나를 떨어뜨리라는 요청. 젬과 자석이 같은 경로(버스 → 스폰 잡)를 쓴다.
+    /// </summary>
     public struct XpDrop
     {
         public float2 Position;
+        public XpDropKind Kind;
+
+        /// <summary>젬의 경험치. 자석이면 쓰지 않는다.</summary>
         public int Value;
     }
 

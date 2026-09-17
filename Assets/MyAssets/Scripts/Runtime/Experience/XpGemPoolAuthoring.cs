@@ -27,6 +27,17 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
         [Tooltip("끌려오는 동안의 가속도 (u/s²)")]
         [SerializeField] private float _attractAcceleration = 24f;
 
+        [Header("자석 아이템 (주우면 모든 젬을 끌어옴)")]
+        [Tooltip("MagnetPickupAuthoring 이 붙은 프리팹 에셋. 비우면 자석이 떨어지지 않는다")]
+        [SerializeField] private GameObject _magnetPrefab;
+
+        [Tooltip("동시에 바닥에 있을 수 있는 자석 수")]
+        [SerializeField] private int _magnetPoolSize = 16;
+
+        [Tooltip("적 1 마리가 죽을 때 자석을 떨어뜨릴 확률 (0.002 = 0.2%)")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _magnetDropChance = 0.002f;
+
         private sealed class XpGemPoolBaker : Baker<XpGemPoolAuthoring>
         {
             public override void Bake(XpGemPoolAuthoring authoring)
@@ -50,6 +61,15 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
                     PickupRadius = authoring._pickupRadius,
                     AttractStartSpeed = authoring._attractStartSpeed,
                     AttractAcceleration = authoring._attractAcceleration,
+                });
+
+                // 프리팹이 없으면 자석 기능을 끈 것으로 본다 (풀 0, 확률 0). 싱글턴은 항상 둬서 조회 쪽 분기를 없앤다.
+                bool hasMagnet = authoring._magnetPrefab != null;
+                AddComponent(entity, new MagnetDropSettings
+                {
+                    Prefab = hasMagnet ? GetEntity(authoring._magnetPrefab, TransformUsageFlags.Dynamic) : Entity.Null,
+                    PoolSize = hasMagnet ? Mathf.Max(0, authoring._magnetPoolSize) : 0,
+                    DropChance = hasMagnet ? authoring._magnetDropChance : 0f,
                 });
             }
         }

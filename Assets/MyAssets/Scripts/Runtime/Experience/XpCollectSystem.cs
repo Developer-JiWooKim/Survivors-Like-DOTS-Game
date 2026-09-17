@@ -26,6 +26,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
     public partial struct XpCollectSystem : ISystem
     {
         private EntityQuery _query;
+        private EntityQuery _magnetQuery;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -33,6 +34,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
             // Active 는 켜진 것만, MaterialMeshInfo 는 상태 무관 (ProjectileMoveSystem 주석 참조)
             _query = SystemAPI.QueryBuilder()
                 .WithAllRW<XpGem, LocalTransform>()
+                .WithAllRW<Active>()
+                .WithPresentRW<MaterialMeshInfo>()
+                .Build();
+
+            _magnetQuery = SystemAPI.QueryBuilder()
+                .WithAll<MagnetPickup, LocalTransform>()
                 .WithAllRW<Active>()
                 .WithPresentRW<MaterialMeshInfo>()
                 .Build();
@@ -50,15 +57,30 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
             // 젬 LocalTransform 에 쓰는 잡이라 플레이어 LocalTransform 을 룩업으로 읽을 수 없다 → 사본 사용
             float2 playerPosition = SystemAPI.GetComponent<PlayerPosition>(player).Value;
 
+            XpCollectSettings settings = SystemAPI.GetSingleton<XpCollectSettings>();
             var collected = new NativeStream(_query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
 
-            JobHandle handle = new XpCollectJob
+            // 1) 자석 줍기 — 자석은 많아야 십여 개라 단일 잡. 주웠는지를 NativeReference 하나로 넘긴다
+            //    (병렬 잡이면 여러 워커가 같은 값에 쓰는 레이스가 된다).
+            var magnetTriggered = new NativeReference<bool>(false, Allocator.TempJob);
+            JobHandle handle = new MagnetPickupJob
             {
                 Player = playerPosition,
-                Settings = SystemAPI.GetSingleton<XpCollectSettings>(),
+                PickupRadius = settings.PickupRadius,
+                Triggered = magnetTriggered,
+            }.Schedule(_magnetQuery, state.Dependency);
+
+            // 2) 젬 흡인·수집 — 자석을 주운 프레임이면 모든 젬을 흡인 상태로 바꾼다.
+            handle = new XpCollectJob
+            {
+                Player = playerPosition,
+                Settings = settings,
                 DeltaTime = SystemAPI.Time.DeltaTime,
+                MagnetTriggered = magnetTriggered,
                 Collected = collected.AsWriter(),
-            }.ScheduleParallel(_query, state.Dependency);
+            }.ScheduleParallel(_query, handle);
+
+            handle = magnetTriggered.Dispose(handle);
 
             handle = new AddExperienceJob
             {
@@ -77,6 +99,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
         public float2 Player;
         public XpCollectSettings Settings;
         public float DeltaTime;
+
+        /// <summary>이번 프레임에 자석을 주웠는지. 참이면 모든 젬이 흡인 상태가 된다.</summary>
+        [ReadOnly] public NativeReference<bool> MagnetTriggered;
 
         public NativeStream.Writer Collected;
 
@@ -110,7 +135,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
 
             if (!gem.Attracted)
             {
-                if (distanceSquared > Settings.MagnetRadius * Settings.MagnetRadius)
+                if (!MagnetTriggered.Value && distanceSquared > Settings.MagnetRadius * Settings.MagnetRadius)
                 {
                     return;
                 }
@@ -157,6 +182,29 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
             // 일시정지(메인 스레드 상태 변경)가 필요한 일이라 잡 안에서 할 수 없다.
             RefRW<PlayerExperience> experience = ExperienceLookup.GetRefRW(Player);
             experience.ValueRW.Xp += total;
+        }
+    }
+
+    /// <summary>
+    /// 플레이어에 닿은 자석을 줍는다. <c>.Schedule()</c>(단일 스레드)로 돌려 <see cref="Triggered"/> 에 안전하게 쓴다.
+    /// </summary>
+    [BurstCompile]
+    internal partial struct MagnetPickupJob : IJobEntity
+    {
+        public float2 Player;
+        public float PickupRadius;
+        public NativeReference<bool> Triggered;
+
+        private void Execute(in LocalTransform transform, EnabledRefRW<Active> active, EnabledRefRW<MaterialMeshInfo> visible)
+        {
+            if (math.distancesq(transform.Position.xy, Player) > PickupRadius * PickupRadius)
+            {
+                return;
+            }
+
+            active.ValueRW = false;
+            visible.ValueRW = false;
+            Triggered.Value = true;
         }
     }
 }

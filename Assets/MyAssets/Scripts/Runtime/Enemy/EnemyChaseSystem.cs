@@ -132,15 +132,16 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             {
                 for (int x = -range; x <= range; x++)
                 {
-                    int key = EnemySpatialHash.KeyOf(center + new int2(x, y));
-                    if (!Neighbors.TryGetFirstValue(key, out AgentRef other, out NativeParallelMultiHashMapIterator<int> iterator))
+                    int2 cell = center + new int2(x, y);
+                    if (!Neighbors.TryGetFirstValue(EnemySpatialHash.KeyOf(cell), out AgentRef other, out NativeParallelMultiHashMapIterator<int> iterator))
                     {
                         continue;
                     }
 
                     do
                     {
-                        if (other.Entity == self)
+                        // 키 충돌로 섞여 든 다른 셀의 적을 거른다 — 안 그러면 같은 이웃에게 두 번 밀린다.
+                        if (other.Entity == self || !EnemySpatialHash.IsInCell(other, cell))
                         {
                             continue;
                         }

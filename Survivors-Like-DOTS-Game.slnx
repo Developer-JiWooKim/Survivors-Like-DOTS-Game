@@ -89,6 +89,7 @@
   <Project Path="Unity.Deformations.csproj" />
   <Project Path="Unity.VisualScripting.DocCodeExamples.csproj" />
   <Project Path="Unity.Mathematics.Extensions.Hybrid.csproj" />
+  <Project Path="Survivors.Tests.csproj" />
   <Project Path="Unity.Collections.Tests.CoreCLR.PrivateJobNested.csproj" />
   <Project Path="Unity.PlasticSCM.Editor.Entities.csproj" />
   <Project Path="Unity.Pipeline.CodeGen.csproj" />

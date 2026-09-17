@@ -52,8 +52,18 @@ namespace Assets.MyAssets.Scripts.Runtime.Spatial
 
         public static int KeyOf(int2 cell)
         {
-            // 서로 다른 셀이 같은 키로 충돌할 수 있지만, 조회 쪽이 거리로 다시 거르므로 정확성에는 영향이 없다.
+            // 서로 다른 셀이 같은 키로 충돌할 수 있다. 한 칸만 볼 때는 거리 검사로 걸러지지만,
+            // **여러 칸을 도는 조회에서는 같은 적이 두 번 나온다** → 조회 쪽이 IsInCell 로 걸러야 한다.
             return (int)math.hash(cell);
+        }
+
+        /// <summary>
+        /// 조회 중인 셀에서 나온 적이 실제로 그 셀에 속하는지. 키 충돌로 섞여 든 다른 셀의 적을 거른다.
+        /// 여러 칸을 도는 조회에서 이걸 빼먹으면 같은 적을 중복으로 센다 (폭발 피해 2 번 등).
+        /// </summary>
+        public static bool IsInCell(in AgentRef agent, int2 cell)
+        {
+            return CellOf(agent.Position).Equals(cell);
         }
     }
 }

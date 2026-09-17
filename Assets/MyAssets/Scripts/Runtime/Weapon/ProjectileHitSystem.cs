@@ -105,7 +105,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
             EnabledRefRW<MaterialMeshInfo> visible)
         {
             float2 position = transform.Position.xy;
-            if (!TryFindOverlap(position, radius.Value, ref projectile.HitHistory, out AgentRef target))
+            if (!SpatialQueries.TryFindOverlap(Enemies, position, radius.Value, ref projectile.HitHistory, out AgentRef target))
             {
                 return;
             }
@@ -149,15 +149,16 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
             {
                 for (int x = -range; x <= range; x++)
                 {
-                    int key = EnemySpatialHash.KeyOf(centerCell + new int2(x, y));
-                    if (!Enemies.TryGetFirstValue(key, out AgentRef enemy, out NativeParallelMultiHashMapIterator<int> iterator))
+                    int2 cell = centerCell + new int2(x, y);
+                    if (!Enemies.TryGetFirstValue(EnemySpatialHash.KeyOf(cell), out AgentRef enemy, out NativeParallelMultiHashMapIterator<int> iterator))
                     {
                         continue;
                     }
 
                     do
                     {
-                        if (enemy.Entity == directHit)
+                        // 키 충돌로 섞여 든 다른 셀의 적을 거른다 — 안 그러면 한 적이 폭발 피해를 두 번 받는다.
+                        if (enemy.Entity == directHit || !EnemySpatialHash.IsInCell(enemy, cell))
                         {
                             continue;
                         }
@@ -175,40 +176,6 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
                     while (Enemies.TryGetNextValue(out enemy, ref iterator));
                 }
             }
-        }
-
-        // alreadyHit 가 ref 인 이유: FixedList 의 Contains 는 ref this 확장이라 in(읽기 전용)으로는 호출할 수 없다.
-        private bool TryFindOverlap(float2 position, float radius, ref FixedList128Bytes<Entity> alreadyHit, out AgentRef target)
-        {
-            int range = EnemySpatialHash.CellRangeFor(radius);
-            int2 center = EnemySpatialHash.CellOf(position);
-
-            for (int y = -range; y <= range; y++)
-            {
-                for (int x = -range; x <= range; x++)
-                {
-                    int key = EnemySpatialHash.KeyOf(center + new int2(x, y));
-                    if (!Enemies.TryGetFirstValue(key, out AgentRef enemy, out NativeParallelMultiHashMapIterator<int> iterator))
-                    {
-                        continue;
-                    }
-
-                    do
-                    {
-                        float reach = radius + enemy.Radius;
-                        if (math.distancesq(position, enemy.Position) <= reach * reach
-                            && !alreadyHit.Contains(enemy.Entity))
-                        {
-                            target = enemy;
-                            return true;
-                        }
-                    }
-                    while (Enemies.TryGetNextValue(out enemy, ref iterator));
-                }
-            }
-
-            target = default;
-            return false;
         }
     }
 }

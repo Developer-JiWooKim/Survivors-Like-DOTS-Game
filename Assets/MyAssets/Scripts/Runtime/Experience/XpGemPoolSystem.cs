@@ -6,7 +6,7 @@ using Unity.Entities;
 namespace Assets.MyAssets.Scripts.Runtime.Experience
 {
     /// <summary>
-    /// 시작 시 젬을 풀 용량만큼 한 번에 만들고 전부 비활성으로 둔다.
+    /// 시작 시 젬·자석 풀을 한 번에 만들고 전부 비활성으로 둔다.
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
@@ -23,20 +23,28 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
         {
             state.Enabled = false;
 
-            XpGemPool pool = SystemAPI.GetSingleton<XpGemPool>();
-            if (pool.Capacity <= 0 || pool.Prefab == Entity.Null)
+            XpGemPool gems = SystemAPI.GetSingleton<XpGemPool>();
+            CreatePool(ref state, gems.Prefab, gems.Capacity);
+
+            if (SystemAPI.TryGetSingleton(out MagnetDropSettings magnets))
+            {
+                CreatePool(ref state, magnets.Prefab, magnets.PoolSize);
+            }
+        }
+
+        private static void CreatePool(ref SystemState state, Entity prefab, int count)
+        {
+            if (count <= 0 || prefab == Entity.Null)
             {
                 return;
             }
 
+            // 인스턴스는 프리팹의 enabled 상태를 물려받는다. 프리팹을 먼저 끄고 복제하면 하나씩 끌 필요가 없다
+            // (EnemySpawnSystem 과 같은 방식).
             EntityManager entityManager = state.EntityManager;
-            NativeArray<Entity> instances = entityManager.Instantiate(pool.Prefab, pool.Capacity, Allocator.Temp);
+            PoolUtility.SetAlive(entityManager, prefab, false);
 
-            for (int i = 0; i < instances.Length; i++)
-            {
-                PoolUtility.SetAlive(entityManager, instances[i], false);
-            }
-
+            NativeArray<Entity> instances = entityManager.Instantiate(prefab, count, Allocator.Temp);
             instances.Dispose();
         }
     }

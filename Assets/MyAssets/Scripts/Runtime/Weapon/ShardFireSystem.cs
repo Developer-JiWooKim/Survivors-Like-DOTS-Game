@@ -41,9 +41,6 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
         /// <summary>한 프레임에 발사할 수 있는 최대 횟수.</summary>
         private const int MaxVolleysPerFrame = 4;
 
-        /// <summary>한 번에 노릴 수 있는 적 수의 상한. 고정 크기 목록에 담기 위한 값 (레벨업 최대 12 보다 크게).</summary>
-        private const int MaxTargets = 16;
-
         private EntityQuery _freeProjectileQuery;
 
         [BurstCompile]
@@ -79,11 +76,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
             hash.BuildHandle.Complete();
 
             float range = weapon.ProjectileSpeed * weapon.ProjectileLifetime;
-            int targetCount = math.min(weapon.TargetCount, MaxTargets);
+            // 결과 목록 용량(SpatialQueries.MaxNearestCount = 16)이 상한. 레벨업 최대 12 보다 크다.
+            int targetCount = math.min(weapon.TargetCount, SpatialQueries.MaxNearestCount);
 
             // 한 프레임에 여러 번 쏘더라도 대상은 같으므로 한 번만 찾는다.
             var targets = new FixedList512Bytes<float2>();
-            FindNearestEnemies(hash.Map, origin, range, targetCount, ref targets);
+            SpatialQueries.FindNearest(hash.Map, origin, range, targetCount, ref targets);
 
             NativeArray<Entity> free = _freeProjectileQuery.ToEntityArray(Allocator.Temp);
             int freeCursor = 0;
@@ -111,86 +109,6 @@ namespace Assets.MyAssets.Scripts.Runtime.Weapon
 
             free.Dispose();
             SystemAPI.SetComponent(player, weapon);
-        }
-
-        /// <summary>
-        /// 사거리 안에서 가까운 적을 최대 <paramref name="count"/> 마리, 가까운 순으로 모은다.
-        /// </summary>
-        private static void FindNearestEnemies(
-            in NativeParallelMultiHashMap<int, AgentRef> enemies, float2 origin, float range, int count,
-            ref FixedList512Bytes<float2> result)
-        {
-            // 거리 제곱을 위치와 나란히 들고 정렬 삽입한다. count 가 작아(≤16) 삽입 정렬이 가장 싸다.
-            var distances = new FixedList128Bytes<float>();
-            float rangeSquared = range * range;
-
-            int2 center = EnemySpatialHash.CellOf(origin);
-            int maxRing = (int)math.ceil(range / EnemySpatialHash.CellSize);
-
-            for (int ring = 0; ring <= maxRing; ring++)
-            {
-                // 고리 ring 의 셀 = 중심에서 체비쇼프 거리가 정확히 ring 인 칸들 (테두리만)
-                for (int y = -ring; y <= ring; y++)
-                {
-                    bool edgeRow = y == -ring || y == ring;
-                    int step = edgeRow ? 1 : ring * 2; // 가운데 행은 양 끝 두 칸만 본다
-
-                    for (int x = -ring; x <= ring; x += step)
-                    {
-                        int key = EnemySpatialHash.KeyOf(center + new int2(x, y));
-                        if (!enemies.TryGetFirstValue(key, out AgentRef enemy, out NativeParallelMultiHashMapIterator<int> iterator))
-                        {
-                            continue;
-                        }
-
-                        do
-                        {
-                            float distanceSquared = math.distancesq(origin, enemy.Position);
-                            if (distanceSquared <= rangeSquared)
-                            {
-                                InsertSorted(ref result, ref distances, enemy.Position, distanceSquared, count);
-                            }
-                        }
-                        while (enemies.TryGetNextValue(out enemy, ref iterator));
-                    }
-                }
-
-                // 다음 고리(ring + 1)의 셀은 원점에서 최소 ring × 셀 크기만큼 떨어져 있다
-                // (원점은 중심 셀 안 어딘가에 있으므로). 이미 count 마리를 모았고 가장 먼 것이 그보다 가까우면 멈춘다.
-                float nextRingMinDistance = ring * EnemySpatialHash.CellSize;
-                if (result.Length == count && distances[count - 1] <= nextRingMinDistance * nextRingMinDistance)
-                {
-                    break;
-                }
-            }
-        }
-
-        private static void InsertSorted(
-            ref FixedList512Bytes<float2> positions, ref FixedList128Bytes<float> distances,
-            float2 position, float distanceSquared, int capacity)
-        {
-            if (positions.Length == capacity && distanceSquared >= distances[capacity - 1])
-            {
-                return;
-            }
-
-            if (positions.Length < capacity)
-            {
-                positions.Add(position);
-                distances.Add(distanceSquared);
-            }
-            else
-            {
-                positions[capacity - 1] = position;
-                distances[capacity - 1] = distanceSquared;
-            }
-
-            // 마지막 원소를 제자리까지 앞으로 민다.
-            for (int i = positions.Length - 1; i > 0 && distances[i] < distances[i - 1]; i--)
-            {
-                (positions[i], positions[i - 1]) = (positions[i - 1], positions[i]);
-                (distances[i], distances[i - 1]) = (distances[i - 1], distances[i]);
-            }
         }
 
         private void FireVolley(

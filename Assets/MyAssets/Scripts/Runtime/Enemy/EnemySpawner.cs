@@ -70,8 +70,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             return baseHealth * math.pow(HealthGrowthPerLevel, math.max(playerLevel - 1, 0));
         }
 
+        /// <summary>
+        /// **벤치마크 전용** 고정 목표 수. 0 보다 크면 시간과 무관하게 이 수를 유지한다.
+        /// 시간 기반 예산은 계속 늘어나 같은 조건으로 반복 측정하기 어렵기 때문 (M1 게이트 1,000 / M2 게이트 10,000).
+        /// </summary>
+        public int FixedTarget;
+
         public int BudgetAt(float elapsedSeconds)
         {
+            if (FixedTarget > 0)
+            {
+                return FixedTarget;
+            }
+
             float minutes = elapsedSeconds * TestTimeScale / 60f;
             return (int)(BaseBudget * math.pow(GrowthPerMinute, minutes));
         }

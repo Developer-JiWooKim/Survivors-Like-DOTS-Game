@@ -36,6 +36,9 @@ namespace Assets.MyAssets.Scripts.Editor
             // 기획서에 젬 색 지정은 없다. 적(파랑)·투사체(흰색)와 구분되는 녹색.
             Create("XpGemQuad", new Color(0.3f, 0.95f, 0.45f, 1f));
 
+            // 자석 아이템. 젬(녹색)·적(파랑)과 한눈에 구분되는 주황.
+            Create("MagnetQuad", new Color(1f, 0.5f, 0.1f, 1f));
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }

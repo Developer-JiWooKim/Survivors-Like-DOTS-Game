@@ -28,6 +28,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
     public partial struct XpGemSpawnSystem : ISystem
     {
         private EntityQuery _freeQuery;
+        private EntityQuery _freeMagnetQuery;
         private EntityQuery _activeQuery;
 
         [BurstCompile]
@@ -35,6 +36,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
         {
             _freeQuery = SystemAPI.QueryBuilder()
                 .WithAll<XpGem>()
+                .WithDisabled<Active>()
+                .Build();
+
+            _freeMagnetQuery = SystemAPI.QueryBuilder()
+                .WithAll<MagnetPickup>()
                 .WithDisabled<Active>()
                 .Build();
 
@@ -78,6 +84,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
 
             NativeList<Entity> free = _freeQuery.ToEntityListAsync(
                 Allocator.TempJob, state.Dependency, out JobHandle freeHandle);
+            NativeList<Entity> freeMagnets = _freeMagnetQuery.ToEntityListAsync(
+                Allocator.TempJob, state.Dependency, out JobHandle freeMagnetsHandle);
             NativeList<Entity> activeEntities = _activeQuery.ToEntityListAsync(
                 Allocator.TempJob, state.Dependency, out JobHandle activeHandle);
             NativeList<LocalTransform> activeTransforms = _activeQuery.ToComponentDataListAsync<LocalTransform>(
@@ -85,11 +93,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
 
             // 여러 스트림을 직렬 잡으로 처리하는 동안 공유하는 상태
             var cursor = new NativeReference<int>(0, Allocator.TempJob);
+            var magnetCursor = new NativeReference<int>(0, Allocator.TempJob);
             var mergeTarget = new NativeReference<int>(SpawnXpGemJob.MergeTargetUnknown, Allocator.TempJob);
 
             JobHandle chain = JobHandle.CombineDependencies(
                 JobHandle.CombineDependencies(freeHandle, activeHandle, transformsHandle),
-                bus.ValueRO.Dependency);
+                JobHandle.CombineDependencies(freeMagnetsHandle, bus.ValueRO.Dependency));
 
             ComponentLookup<LocalTransform> transformLookup = SystemAPI.GetComponentLookup<LocalTransform>();
             ComponentLookup<XpGem> gemLookup = SystemAPI.GetComponentLookup<XpGem>();
@@ -104,10 +113,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
                 {
                     Drops = stream.AsReader(),
                     FreeGems = free.AsDeferredJobArray(),
+                    FreeMagnets = freeMagnets.AsDeferredJobArray(),
                     ActiveGems = activeEntities.AsDeferredJobArray(),
                     ActiveTransforms = activeTransforms.AsDeferredJobArray(),
                     PlayerPosition = playerPosition,
                     Cursor = cursor,
+                    MagnetCursor = magnetCursor,
                     MergeTarget = mergeTarget,
                     TransformLookup = transformLookup,
                     GemLookup = gemLookup,
@@ -126,6 +137,7 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
                 activeEntities.Dispose(chain),
                 activeTransforms.Dispose(chain));
             disposed = JobHandle.CombineDependencies(disposed, cursor.Dispose(chain), mergeTarget.Dispose(chain));
+            disposed = JobHandle.CombineDependencies(disposed, freeMagnets.Dispose(chain), magnetCursor.Dispose(chain));
 
             state.Dependency = disposed;
         }
@@ -140,11 +152,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
         public NativeStream.Reader Drops;
 
         [ReadOnly] public NativeArray<Entity> FreeGems;
+        [ReadOnly] public NativeArray<Entity> FreeMagnets;
         [ReadOnly] public NativeArray<Entity> ActiveGems;
         [ReadOnly] public NativeArray<LocalTransform> ActiveTransforms;
         public float2 PlayerPosition;
 
         public NativeReference<int> Cursor;
+        public NativeReference<int> MagnetCursor;
         public NativeReference<int> MergeTarget;
 
         public ComponentLookup<LocalTransform> TransformLookup;
@@ -161,9 +175,27 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
                 {
                     XpDrop drop = Drops.Read<XpDrop>();
 
+                    if (drop.Kind == XpDropKind.Magnet)
+                    {
+                        // 자석 풀이 바닥나면 이번 자석은 떨어지지 않는다 (경험치와 달리 합칠 대상이 없다).
+                        if (MagnetCursor.Value < FreeMagnets.Length)
+                        {
+                            PlaceAt(FreeMagnets[MagnetCursor.Value], drop.Position);
+                            MagnetCursor.Value++;
+                        }
+                        continue;
+                    }
+
                     if (Cursor.Value < FreeGems.Length)
                     {
-                        Place(FreeGems[Cursor.Value], drop);
+                        Entity gem = FreeGems[Cursor.Value];
+                        GemLookup[gem] = new XpGem
+                        {
+                            Value = drop.Value,
+                            Attracted = false,
+                            Speed = 0f,
+                        };
+                        PlaceAt(gem, drop.Position);
                         Cursor.Value++;
                     }
                     else
@@ -175,22 +207,15 @@ namespace Assets.MyAssets.Scripts.Runtime.Experience
             }
         }
 
-        private void Place(Entity gem, in XpDrop drop)
+        private void PlaceAt(Entity item, float2 position)
         {
             // 프리팹의 스케일·Z 를 보존하고 XY 만 옮긴다.
-            LocalTransform transform = TransformLookup[gem];
-            transform.Position.xy = drop.Position;
-            TransformLookup[gem] = transform;
+            LocalTransform transform = TransformLookup[item];
+            transform.Position.xy = position;
+            TransformLookup[item] = transform;
 
-            GemLookup[gem] = new XpGem
-            {
-                Value = drop.Value,
-                Attracted = false,
-                Speed = 0f,
-            };
-
-            ActiveLookup.SetComponentEnabled(gem, true);
-            VisibleLookup.SetComponentEnabled(gem, true);
+            ActiveLookup.SetComponentEnabled(item, true);
+            VisibleLookup.SetComponentEnabled(item, true);
         }
 
         private void MergeIntoFarthest(int value)
