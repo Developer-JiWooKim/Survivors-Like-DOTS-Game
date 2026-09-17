@@ -22,6 +22,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         [Tooltip("바깥 반경.")]
         [SerializeField] private float _respawnMaxRadius = 36f;
 
+        [Tooltip("리사이클 거리. 이보다 멀어진 적은 반대편 링으로 옮긴다. 링 바깥 반경보다 커야 한다 (기획서 간격 9 유지 → 45)")]
+        [SerializeField] private float _recycleDistance = 45f;
+
         [Header("시간 기반 예산 (기획서 6.2)")]
         [Tooltip("0 분 시점 목표 수. 기획서 50")]
         [SerializeField] private float _baseBudget = 50f;
@@ -68,6 +71,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                     PoolSize = authoring._poolSize,
                     RingMinRadius = authoring._respawnMinRadius,
                     RingMaxRadius = authoring._respawnMaxRadius,
+
+                    // 링보다 가까우면 스폰 직후 리사이클되는 무한 반복이 생긴다. 최소 링 바깥 + 1 로 고정.
+                    RecycleDistance = Mathf.Max(authoring._recycleDistance, authoring._respawnMaxRadius + 1f),
                     RandomSeed = authoring._randomSeed == 0 ? 1u : authoring._randomSeed,
                 });
 

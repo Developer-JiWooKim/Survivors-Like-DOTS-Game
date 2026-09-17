@@ -9,6 +9,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
+using Random = Unity.Mathematics.Random;
 
 namespace Assets.MyAssets.Scripts.Runtime.Enemy
 {
@@ -22,42 +23,49 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
     /// 병렬화가 여전히 안전한 이유:
     /// 이웃 위치는 해시에 복사된 **이번 프레임 시작 시점 스냅샷**에서 읽고, 쓰기는 자기 LocalTransform 에만 한다.
     /// 이웃이 이번 프레임에 어디로 움직이는지는 보지 않는다 — 한 프레임 늦은 정보로 피하지만 체감되지 않는다.
+    ///
+    /// **리사이클** (기획서 6.2)도 여기서 한다: 플레이어에게서 너무 멀어진 적은 추격 대신
+    /// 플레이어 기준 **반대편** 스폰 링으로 순간이동한다. 죽이지 않으므로 체력·스폰 비용이 그대로다.
+    /// 적 전체를 도는 루프를 하나 더 만들지 않으려고 추격 잡에 합쳤다 (거리 계산도 공유).
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(PlayerMoveSystem))]
     public partial struct EnemyChaseSystem : ISystem
     {
-        private EntityQuery _playerQuery;
+        private uint _frame;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            // 쿼리는 매 프레임 만들지 않고 한 번만 만들어 재사용한다.
-            _playerQuery = SystemAPI.QueryBuilder()
-                .WithAll<PlayerMovement, LocalTransform>()
-                .Build();
-
-            state.RequireForUpdate(_playerQuery);
+            state.RequireForUpdate<PlayerPosition>();
             state.RequireForUpdate<EnemyMovement>();
             state.RequireForUpdate<EnemySpatialHash>();
             state.RequireForUpdate<EnemySeparation>();
+            state.RequireForUpdate<EnemySpawner>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            LocalTransform playerTransform = _playerQuery.GetSingleton<LocalTransform>();
+            // PlayerPosition 은 바로 앞의 PlayerMoveSystem 이 메인 스레드에서 갱신한 이번 프레임 값이다.
+            // LocalTransform 을 읽으면 LocalTransform 에 쓰는 잡들을 기다려야 한다.
+            float2 player = SystemAPI.GetSingleton<PlayerPosition>().Value;
             EnemySeparation separation = SystemAPI.GetSingleton<EnemySeparation>();
+            EnemySpawner spawner = SystemAPI.GetSingleton<EnemySpawner>();
             RefRW<EnemySpatialHash> hash = SystemAPI.GetSingletonRW<EnemySpatialHash>();
 
             var job = new ChaseJob
             {
-                Target = playerTransform.Position.xy,
+                Target = player,
                 DeltaTime = SystemAPI.Time.DeltaTime,
                 Neighbors = hash.ValueRO.Map,
                 SeparationStrength = separation.Strength,
                 MaxNeighbors = separation.MaxNeighbors,
+                RecycleDistance = spawner.RecycleDistance,
+                RingMinRadius = spawner.RingMinRadius,
+                RingMaxRadius = spawner.RingMaxRadius,
+                Seed = math.hash(new uint2(spawner.RandomSeed ^ 0xA5A5A5A5u, ++_frame)),
             };
 
             // 해시 재구축 잡이 끝난 뒤에 돌아야 한다. 컨테이너가 컴포넌트 안에 있어 ECS 가 이 의존성을 모른다.
@@ -79,6 +87,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         public float SeparationStrength;
         public int MaxNeighbors;
 
+        public float RecycleDistance;
+        public float RingMinRadius;
+        public float RingMaxRadius;
+        public uint Seed;
+
         [ReadOnly] public NativeParallelMultiHashMap<int, AgentRef> Neighbors;
 
         private void Execute(Entity self, ref LocalTransform transform, in EnemyMovement movement, in HitRadius radius)
@@ -86,11 +99,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             float2 position = transform.Position.xy;
             float maxStep = movement.Speed * DeltaTime;
 
-            // 1) 추격 — 길이 1 이하의 방향
             // 2D 게임이라 Z 는 추격 방향에 반영하지 않는다 (xy 만 사용).
-            float2 chase = float2.zero;
             float2 toTarget = Target - position;
             float distance = math.length(toTarget);
+
+            // 0) 리사이클 — 너무 멀어졌으면 반대편 링으로 옮기고 이번 프레임 이동은 건너뛴다.
+            if (distance > RecycleDistance)
+            {
+                transform.Position.xy = RecyclePosition(self, toTarget / distance);
+                return;
+            }
+
+            // 1) 추격 — 길이 1 이하의 방향
+            float2 chase = float2.zero;
 
             // 플레이어와 사실상 같은 위치면 방향 계산이 불안정해진다(0 으로 나누기).
             if (distance > 1e-3f)
@@ -116,6 +137,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             }
 
             transform.Position.xy += direction * maxStep;
+        }
+
+        /// <summary>
+        /// 플레이어 기준 반대편 링 위의 위치.
+        /// 적 → 플레이어 방향(<paramref name="towardPlayer"/>)으로 플레이어를 지나 링 반경만큼 간 지점 =
+        /// 플레이어가 달려가는 쪽 앞에 다시 나타난다. 뒤처진 적이 앞쪽 밀도로 돌아오는 효과.
+        /// </summary>
+        private float2 RecyclePosition(Entity self, float2 towardPlayer)
+        {
+            // 링 반경만 무작위. 워커 간 Random 공유는 레이스라 엔티티마다 결정적으로 만든다.
+            var random = Random.CreateFromIndex(math.hash(new uint2(Seed, (uint)self.Index)));
+            float ring = random.NextFloat(RingMinRadius, RingMaxRadius);
+            return Target + towardPlayer * ring;
         }
 
         private float2 ComputeSeparation(Entity self, float2 position, float selfRadius)

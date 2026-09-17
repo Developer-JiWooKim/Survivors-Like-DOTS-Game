@@ -28,6 +28,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
         /// <summary>스폰 링의 바깥 반경.</summary>
         public float RingMaxRadius;
 
+        /// <summary>
+        /// 리사이클 거리 (기획서 6.2). 플레이어에게서 이보다 멀어진 적은 죽이지 않고 **반대편 링**으로 옮긴다.
+        /// 기획서는 35 (링 22~26 기준, 간격 9). 링을 32~36 으로 잡았으므로 같은 간격을 유지해 45 (2026-09-17 결정).
+        /// 링 바깥 반경보다 작으면 스폰 직후 곧바로 리사이클되므로 반드시 더 커야 한다.
+        /// </summary>
+        public float RecycleDistance;
+
         /// <summary>난수 시드. 고정하면 매 실행 같은 배치가 나와 성능 비교가 가능하다.</summary>
         public uint RandomSeed;
     }
