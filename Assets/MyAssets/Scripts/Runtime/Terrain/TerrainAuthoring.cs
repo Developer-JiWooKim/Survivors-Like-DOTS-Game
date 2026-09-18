@@ -9,12 +9,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
     /// </summary>
     public sealed class TerrainAuthoring : MonoBehaviour
     {
-        [Header("맵 (기획서 4.1 — 512×512, 1u = 1타일)")]
+        [Header("맵 (기획서 4.1 — 128×128 확정 2026-09-18, 1u = 1타일)")]
         [Tooltip("가로 타일 수")]
-        [SerializeField] private int _width = 512;
+        [SerializeField] private int _width = 128;
 
         [Tooltip("세로 타일 수")]
-        [SerializeField] private int _height = 512;
+        [SerializeField] private int _height = 128;
 
         [Tooltip("맵 생성 시드. 같은 시드면 같은 맵이 나온다")]
         [SerializeField] private uint _seed = 1234;
@@ -55,6 +55,27 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
         [Tooltip("기름의 확산 확률 배수. 기획서 4.3 — 3배")]
         [SerializeField] private float _oilSpreadMultiplier = 3f;
 
+        [Tooltip("감전 지속 틱. 기획서 4.3 — 0.5초 = 5틱")]
+        [Range(1, 255)]
+        [SerializeField] private int _shockDurationTicks = 5;
+
+        [Tooltip("빙판 지속 틱. 기획서 4.2 — 15초 후 물로 해동 = 150틱")]
+        [Range(1, 255)]
+        [SerializeField] private int _iceDurationTicks = 150;
+
+        [Tooltip("감전 한 번이 훑을 최대 칸 수. 성능 상한이자 밸런스 장치 (거대한 호수 전체가 한 방에 감전되는 것을 막는다)")]
+        [SerializeField] private int _shockMaxCells = 2000;
+
+        [Header("지형 피해 (기획서 4.3·4.4 — 수치는 M3 임시값)")]
+        [Tooltip("연소 타일 위 유닛이 받는 초당 피해. 플레이어에게도 들어간다 (기획서 4.4)")]
+        [SerializeField] private float _burnDamagePerSecond = 12f;
+
+        [Tooltip("감전 타일 위 유닛이 받는 초당 피해")]
+        [SerializeField] private float _shockDamagePerSecond = 40f;
+
+        [Tooltip("기름이 탈 때의 피해 배수. 기획서 4.3 — 2배")]
+        [SerializeField] private float _oilDamageMultiplier = 2f;
+
         [Header("타일 렌더 풀")]
         [Tooltip("TileViewAuthoring 이 붙은 프리팹 에셋 (씬 안의 오브젝트 아님). 비우면 지형이 보이지 않는다")]
         [SerializeField] private GameObject _tilePrefab;
@@ -94,6 +115,12 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
                     TickInterval = authoring._tickInterval,
                     IgniteChance = authoring._igniteChance,
                     OilSpreadMultiplier = authoring._oilSpreadMultiplier,
+                    ShockDurationTicks = (byte)authoring._shockDurationTicks,
+                    IceDurationTicks = (byte)authoring._iceDurationTicks,
+                    ShockMaxCells = Mathf.Max(0, authoring._shockMaxCells),
+                    BurnDamagePerSecond = authoring._burnDamagePerSecond,
+                    ShockDamagePerSecond = authoring._shockDamagePerSecond,
+                    OilDamageMultiplier = authoring._oilDamageMultiplier,
                 });
 
                 // 프리팹이 없으면 렌더를 끈 것으로 본다 (창 0×0). 싱글턴은 항상 둬서 조회 쪽 분기를 없앤다

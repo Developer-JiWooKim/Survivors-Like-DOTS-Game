@@ -115,7 +115,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
                     CountBurning(x, y + 1);
 
                 float random = BurnRules.Random01(index, Tick);
-                Write[index] = BurnRules.Step(tile, burningNeighbors, random, Settings);
+
+                // 연소를 먼저, 그다음 타이머. 순서가 중요하다 — 연소가 타일 종류를 바꿀 수 있고
+                // (물 위 기름 → 물), 타이머는 바뀐 종류를 기준으로 만료를 판단해야 한다.
+                TileData next = BurnRules.Step(tile, burningNeighbors, random, Settings);
+                Write[index] = TileStateRules.StepTimer(next);
             }
 
             private int CountBurning(int x, int y)

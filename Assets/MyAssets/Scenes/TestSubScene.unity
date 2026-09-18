@@ -163,8 +163,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0c81fd1e57c5eb4d98f4514f3de91e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Survivors.Runtime::Assets.MyAssets.Scripts.Runtime.Terrain.TerrainAuthoring
-  _width: 32
-  _height: 32
+  _width: 128
+  _height: 128
   _seed: 1234
   _rockThreshold: 0.62
   _waterThreshold: 0.55
@@ -174,9 +174,18 @@ MonoBehaviour:
   _grassFrequency: 0.03
   _spawnClearRadius: 12
   _grassFuel: 120
+  _tickInterval: 0.1
+  _igniteChance: 0.12
+  _oilSpreadMultiplier: 3
+  _shockDurationTicks: 5
+  _iceDurationTicks: 150
+  _shockMaxCells: 2000
+  _burnDamagePerSecond: 12
+  _shockDamagePerSecond: 40
+  _oilDamageMultiplier: 2
   _tilePrefab: {fileID: 7057572100998834169, guid: 7144e3b6e01b2494aba782e5520c2118, type: 3}
-  _viewWidth: 50
-  _viewHeight: 50
+  _viewWidth: 55
+  _viewHeight: 55
   _depth: 1
 --- !u!1 &526493747
 GameObject:
@@ -490,8 +499,8 @@ MonoBehaviour:
   _recycleDistance: 45
   _baseBudget: 50
   _growthPerMinute: 1.28
-  _testTimeScale: 10
-  _benchmarkFixedTarget: 0
+  _testTimeScale: 100
+  _benchmarkFixedTarget: 10000
   _healthGrowthPerLevel: 1.1
   _separationStrength: 1.5
   _separationMaxNeighbors: 16

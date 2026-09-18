@@ -10,10 +10,20 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
     /// <summary>
     /// 확산을 눈으로 확인하기 위한 **임시 디버그 도구**. 점화원(화염구)과 기름통은 M3 후반에 들어온다.
     ///
-    /// | 키 | 동작 |
-    /// |---|---|
-    /// | F | 플레이어가 선 칸에 불을 붙인다 |
-    /// | G | 플레이어 주변에 기름을 뿌린다 (반경 3) |
+    /// | 키 | 동작 | 나중에 대신할 것 |
+    /// |---|---|---|
+    /// | F | 플레이어가 선 칸에 불을 붙인다 | 화염구 |
+    /// | G | 플레이어 주변에 기름을 뿌린다 (반경 3) | 기름통 |
+    /// | E | 플레이어가 선 물 덩어리를 감전시킨다 | 전격 사슬 |
+    /// | R | 플레이어 주변의 물을 얼린다 (반경 3) | 서리 파동 |
+    /// | T | 플레이어 주변을 **넓게** 점화 (반경 30) | — (측정 전용) |
+    ///
+    /// T 는 게임플레이용이 아니라 **성능 측정용**이다. 연소 확산의 최악 조건(화면 전체가 불바다)을
+    /// 한 번에 만들어야 지형이 프레임에 얼마나 얹히는지 잴 수 있다. F 로는 확산을 기다려야 해서
+    /// 측정 시점마다 불의 규모가 달라진다 — **같은 조건에서 재라**는 CLAUDE.md 4 장을 지키기 위한 장치다.
+    ///
+    /// E·R 은 <see cref="TerrainEffects"/> 큐를 거친다 — 실제 무기가 쓸 경로를 그대로 쓴다.
+    /// F·G 는 그리드를 직접 고친다 (칠하기는 큐를 거칠 이유가 없다).
     ///
     /// 왜 Input Actions 에셋이 아니라 Keyboard 직접 읽기인가:
     /// 액션 에셋을 고치는 건 사용자 몫인데(CLAUDE.md 3.4), 무기가 들어오면 지워질 디버그 키 때문에
@@ -23,14 +33,18 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
     /// (<c>PlayerInputSystem</c> 과 같은 사정).
     /// </summary>
     [UpdateInGroup(typeof(GameplaySystemGroup))]
-    [UpdateBefore(typeof(TerrainTickSystem))]
+    [UpdateBefore(typeof(TerrainEffectSystem))]
     public partial class DebugTerrainPaintSystem : SystemBase
     {
         private const int OilBrushRadius = 3;
 
+        /// <summary>T 키의 점화 반경. 카메라 시야(~30×17 u)를 덮고도 남는 크기.</summary>
+        private const float BlazeRadius = 30f;
+
         protected override void OnCreate()
         {
             RequireForUpdate<TerrainGrid>();
+            RequireForUpdate<TerrainEffects>();
             RequireForUpdate<PlayerPosition>();
         }
 
@@ -44,7 +58,10 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
 
             bool ignite = keyboard.fKey.wasPressedThisFrame;
             bool pourOil = keyboard.gKey.wasPressedThisFrame;
-            if (!ignite && !pourOil)
+            bool shock = keyboard.eKey.wasPressedThisFrame;
+            bool freeze = keyboard.rKey.wasPressedThisFrame;
+            bool blaze = keyboard.tKey.wasPressedThisFrame;
+            if (!ignite && !pourOil && !shock && !freeze && !blaze)
             {
                 return;
             }
@@ -67,6 +84,27 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
             if (ignite)
             {
                 Ignite(grid.ValueRO, center);
+            }
+
+            // 감전·동결은 무기가 쓸 경로(효과 큐)를 그대로 쓴다. TerrainEffectSystem 이 같은 프레임에 처리한다.
+            if (shock || freeze || blaze)
+            {
+                RefRW<TerrainEffects> effects = SystemAPI.GetSingletonRW<TerrainEffects>();
+
+                if (shock)
+                {
+                    effects.ValueRW.Request(center, TerrainEffectKind.Shock);
+                }
+
+                if (freeze)
+                {
+                    effects.ValueRW.Request(center, TerrainEffectKind.Freeze, OilBrushRadius);
+                }
+
+                if (blaze)
+                {
+                    effects.ValueRW.Request(center, TerrainEffectKind.Ignite, BlazeRadius);
+                }
             }
         }
 
