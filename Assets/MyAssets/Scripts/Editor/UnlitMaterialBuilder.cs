@@ -39,6 +39,11 @@ namespace Assets.MyAssets.Scripts.Editor
             // 자석 아이템. 젬(녹색)·적(파랑)과 한눈에 구분되는 주황.
             Create("MagnetQuad", new Color(1f, 0.5f, 0.1f, 1f));
 
+            // 지형 타일. 실제 색은 타일마다 URPMaterialPropertyBaseColor 로 덮어쓰므로
+            // (TileColors) 여기 색은 프리팹을 인스펙터에서 볼 때의 기본값일 뿐이다.
+            // 머티리얼을 타일 종류별로 나누지 않는 이유는 TileViewAuthoring 주석 참조.
+            Create("TerrainTileQuad", new Color(0.26f, 0.21f, 0.15f, 1f));
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
