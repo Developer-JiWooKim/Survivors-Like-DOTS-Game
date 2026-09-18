@@ -44,6 +44,17 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
         [Range(0, 255)]
         [SerializeField] private int _grassFuel = 120;
 
+        [Header("상태 전파 (기획서 4.3)")]
+        [Tooltip("틱 간격(초). 기획서 4.3 — 10Hz = 0.1")]
+        [SerializeField] private float _tickInterval = 0.1f;
+
+        [Tooltip("불타는 이웃 하나가 풀에 옮겨붙일 틱당 확률. 기획서에 없는 M3 임시값")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _igniteChance = 0.12f;
+
+        [Tooltip("기름의 확산 확률 배수. 기획서 4.3 — 3배")]
+        [SerializeField] private float _oilSpreadMultiplier = 3f;
+
         [Header("타일 렌더 풀")]
         [Tooltip("TileViewAuthoring 이 붙은 프리팹 에셋 (씬 안의 오브젝트 아님). 비우면 지형이 보이지 않는다")]
         [SerializeField] private GameObject _tilePrefab;
@@ -76,6 +87,13 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
                     GrassFrequency = authoring._grassFrequency,
                     SpawnClearRadius = authoring._spawnClearRadius,
                     GrassFuel = (byte)authoring._grassFuel,
+                });
+
+                AddComponent(entity, new TerrainTickSettings
+                {
+                    TickInterval = authoring._tickInterval,
+                    IgniteChance = authoring._igniteChance,
+                    OilSpreadMultiplier = authoring._oilSpreadMultiplier,
                 });
 
                 // 프리팹이 없으면 렌더를 끈 것으로 본다 (창 0×0). 싱글턴은 항상 둬서 조회 쪽 분기를 없앤다

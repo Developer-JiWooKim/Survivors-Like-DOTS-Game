@@ -30,6 +30,19 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
         /// <summary>행 우선(row-major) 타일 배열. 길이 = <see cref="Width"/> × <see cref="Height"/>.</summary>
         public NativeArray<TileData> Tiles;
 
+        /// <summary>
+        /// 확산 틱의 쓰기 대상 (기획서 8.3 의 더블 버퍼링). 틱이 끝나면 <see cref="Swap"/> 으로 <see cref="Tiles"/> 와 바꾼다.
+        ///
+        /// 왜 제자리에서 고치지 않나:
+        /// 확산은 이웃을 읽어 자신을 정한다. 제자리로 하면 먼저 처리된 칸의 **이번 틱 결과**를
+        /// 옆 칸이 읽어버려서, 불이 한 틱에 여러 칸을 건너뛰고 그 거리가 **잡의 실행 순서에 따라 달라진다**.
+        /// 읽기와 쓰기를 갈라 두면 모든 칸이 같은 스냅샷을 보므로 병렬로 돌려도 결과가 하나로 정해진다.
+        /// </summary>
+        public NativeArray<TileData> Back;
+
+        /// <summary>지금까지 지난 확산 틱 수. 난수 해시의 입력이라 결정성의 일부다 (<see cref="BurnRules.Random01"/>).</summary>
+        public uint Tick;
+
         public int Width;
         public int Height;
 
@@ -45,6 +58,16 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
         public void RegisterReader(JobHandle readerHandle)
         {
             ReadersHandle = JobHandle.CombineDependencies(ReadersHandle, readerHandle);
+        }
+
+        /// <summary>
+        /// 앞뒤 버퍼를 바꾼다. 잡은 배열 구조체를 **값으로** 복사해 가지므로, 잡을 띄운 직후
+        /// 메인 스레드에서 이 필드들을 바꿔도 돌고 있는 잡에는 영향이 없다.
+        /// 다음 프레임의 읽기가 틱 결과를 보게 하는 건 <see cref="WriteHandle"/> 의 역할이다.
+        /// </summary>
+        public void Swap()
+        {
+            (Tiles, Back) = (Back, Tiles);
         }
 
         /// <summary>월드 좌표가 속한 타일 좌표. 경계 밖일 수도 있다 — 쓰기 전에 <see cref="InBounds"/> 로 확인할 것.</summary>

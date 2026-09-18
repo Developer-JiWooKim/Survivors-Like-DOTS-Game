@@ -45,6 +45,11 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
             {
                 grid.Tiles.Dispose();
             }
+
+            if (grid.Back.IsCreated)
+            {
+                grid.Back.Dispose();
+            }
         }
 
         [BurstCompile]
@@ -57,6 +62,9 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
 
             int count = settings.Width * settings.Height;
             var tiles = new NativeArray<TileData>(count, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+            // 확산 틱의 쓰기 대상 (기획서 8.3 더블 버퍼링). 틱 잡이 모든 칸을 덮어쓰므로 초기화하지 않는다.
+            var back = new NativeArray<TileData>(count, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
             // 맵 중앙이 월드 원점(= 플레이어 시작 지점)에 오도록. 기획서에 원점 규정은 없지만
             // 스폰·리사이클이 전부 플레이어 기준 상대 좌표라 중앙 정렬이 가장 덜 놀랍다.
@@ -75,6 +83,8 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
             state.EntityManager.AddComponentData(gridEntity, new TerrainGrid
             {
                 Tiles = tiles,
+                Back = back,
+                Tick = 0,
                 Width = settings.Width,
                 Height = settings.Height,
                 Origin = origin,

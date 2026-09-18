@@ -60,6 +60,10 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
                     return new float4(0.10f, 0.22f, 0.42f, 1f);
                 case TileType.Oil:
                     return new float4(0.08f, 0.07f, 0.10f, 1f);
+                case TileType.OilOnWater:
+                    // 기름(거의 검정)에 물의 파랑을 섞었다. 다 타면 물이 돌아온다는 걸
+                    // 플레이어가 불을 붙이기 **전에** 알아볼 수 있어야 한다.
+                    return new float4(0.09f, 0.11f, 0.20f, 1f);
                 case TileType.Ice:
                     return new float4(0.45f, 0.62f, 0.72f, 1f);
                 case TileType.Crack:

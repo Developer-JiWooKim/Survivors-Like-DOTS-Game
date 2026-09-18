@@ -16,6 +16,38 @@ namespace Assets.MyAssets.Scripts.Runtime.Terrain
         Ice = 4,
         Crack = 5,
         Rock = 6,
+
+        /// <summary>
+        /// 물 위에 뜬 기름 (2026-09-18 결정 — [ISSUE-012](../../../../../Docs/IssueLog.md)).
+        ///
+        /// 왜 별도 종류인가:
+        /// 기름을 칠하면 타일을 덮어쓰기 때문에 "원래 물이었다" 는 정보가 사라지고, 다 타면
+        /// 기획서 4.3 대로 흙이 되어 **물이 영구히 없어진다.** 물은 방화선이자 감전 매개이고
+        /// 빙판의 재료라, 기름 한 번으로 호수를 지울 수 있으면 지형 소모가 최적 전략이 된다.
+        ///
+        /// <see cref="TileData"/> 의 4 byte 예산(기획서 4.1)에는 "원래 무엇이었나" 를 담을 자리가 없다.
+        /// Type 값 하나를 더 쓰는 것으로 같은 정보를 공짜로 표현한다 — 다 타면 <see cref="Water"/> 로 돌아간다.
+        /// </summary>
+        OilOnWater = 7,
+    }
+
+    /// <summary>타일 종류를 묶어서 묻는 질문들. 종류가 늘 때 분기를 한 곳에서만 고치기 위한 것.</summary>
+    public static class TileTypes
+    {
+        /// <summary>기름으로 취급하는가 — 확산 확률 3 배(기획서 4.3)가 붙는 종류.</summary>
+        public static bool IsOil(TileType type)
+        {
+            return type == TileType.Oil || type == TileType.OilOnWater;
+        }
+
+        /// <summary>
+        /// 물로 취급하는가 — 감전 flood fill(기획서 4.3)과 동결(물 → 빙판)의 대상.
+        /// 기름이 떠 있어도 아래는 물이므로 전격·냉기 콤보는 그대로 성립해야 한다.
+        /// </summary>
+        public static bool IsWaterLike(TileType type)
+        {
+            return type == TileType.Water || type == TileType.OilOnWater;
+        }
     }
 
     /// <summary>
