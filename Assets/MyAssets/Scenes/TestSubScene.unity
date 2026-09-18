@@ -499,8 +499,8 @@ MonoBehaviour:
   _recycleDistance: 45
   _baseBudget: 50
   _growthPerMinute: 1.28
-  _testTimeScale: 100
-  _benchmarkFixedTarget: 10000
+  _testTimeScale: 10
+  _benchmarkFixedTarget: 0
   _healthGrowthPerLevel: 1.1
   _separationStrength: 1.5
   _separationMaxNeighbors: 16

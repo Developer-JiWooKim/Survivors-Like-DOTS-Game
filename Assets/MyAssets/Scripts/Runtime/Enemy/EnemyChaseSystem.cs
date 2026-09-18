@@ -3,6 +3,7 @@ using Assets.MyAssets.Scripts.Runtime.Player;
 using Assets.MyAssets.Scripts.Runtime.Pooling;
 using Assets.MyAssets.Scripts.Runtime.Run;
 using Assets.MyAssets.Scripts.Runtime.Spatial;
+using Assets.MyAssets.Scripts.Runtime.Terrain;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -55,10 +56,23 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             EnemySpawner spawner = SystemAPI.GetSingleton<EnemySpawner>();
             RefRW<EnemySpatialHash> hash = SystemAPI.GetSingletonRW<EnemySpatialHash>();
 
+            // 지형이 없는 씬(벤치마크 전용 등)에서도 돌아야 하므로 있을 때만 붙인다.
+            // 잡은 Width == 0 을 "지형 없음" 으로 읽는다.
+            bool hasGrid = SystemAPI.TryGetSingleton(out Terrain.TerrainGrid grid);
+
+            // 흐름장 (ISSUE-013). 첫 프레임에는 아직 없어 직진 추격으로 돈다.
+            bool hasFlow = SystemAPI.TryGetSingleton(out Terrain.FlowField flow) && flow.HasField;
+
             var job = new ChaseJob
             {
                 Target = player,
                 DeltaTime = SystemAPI.Time.DeltaTime,
+                Tiles = hasGrid ? grid.Tiles : default,
+                GridWidth = hasGrid ? grid.Width : 0,
+                GridHeight = hasGrid ? grid.Height : 0,
+                GridOrigin = hasGrid ? grid.Origin : float2.zero,
+                Flow = hasFlow ? flow.Distance : default,
+                HasFlow = hasFlow,
                 Neighbors = hash.ValueRO.Map,
                 SeparationStrength = separation.Strength,
                 MaxNeighbors = separation.MaxNeighbors,
@@ -69,10 +83,34 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
             };
 
             // 해시 재구축 잡이 끝난 뒤에 돌아야 한다. 컨테이너가 컴포넌트 안에 있어 ECS 가 이 의존성을 모른다.
-            JobHandle handle = job.ScheduleParallel(
-                JobHandle.CombineDependencies(state.Dependency, hash.ValueRO.BuildHandle));
+            // 지형 그리드도 같은 사정이라 확산 틱 잡의 핸들을 함께 건다.
+            JobHandle dependency = JobHandle.CombineDependencies(state.Dependency, hash.ValueRO.BuildHandle);
+            if (hasGrid)
+            {
+                dependency = JobHandle.CombineDependencies(dependency, grid.WriteHandle);
+            }
+
+            if (hasFlow)
+            {
+                // 흐름장 BFS 잡이 끝난 뒤에 읽는다.
+                dependency = JobHandle.CombineDependencies(dependency, flow.WriteHandle);
+            }
+
+            JobHandle handle = job.ScheduleParallel(dependency);
 
             hash.ValueRW.RegisterReader(handle);
+
+            if (hasGrid)
+            {
+                SystemAPI.GetSingletonRW<Terrain.TerrainGrid>().ValueRW.RegisterReader(handle);
+            }
+
+            if (hasFlow)
+            {
+                // 다음 재계산이 이 읽기 뒤에 일어나도록 등록한다.
+                SystemAPI.GetSingletonRW<Terrain.FlowField>().ValueRW.RegisterReader(handle);
+            }
+
             state.Dependency = handle;
         }
     }
@@ -94,10 +132,39 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
 
         [ReadOnly] public NativeParallelMultiHashMap<int, AgentRef> Neighbors;
 
+        /// <summary>지형 타일. <see cref="GridWidth"/> 가 0 이면 지형 없는 씬이다.</summary>
+        [ReadOnly] public NativeArray<TileData> Tiles;
+
+        public int GridWidth;
+        public int GridHeight;
+        public float2 GridOrigin;
+
+        /// <summary>플레이어까지의 거리 필드 (ISSUE-013 → ISSUE-014). 그리드와 크기·원점을 공유한다.</summary>
+        [ReadOnly] public NativeArray<float> Flow;
+
+        public bool HasFlow;
+
+        /// <summary>
+        /// 이 거리 안에서는 필드 대신 직진한다.
+        /// 필드는 **칸 단위**라 플레이어가 선 칸 주변에서는 기울기가 칸 중심을 향한다.
+        /// 가까이서 그대로 쓰면 적이 칸 경계에서 떨린다. 코앞에는 보통 벽이 없으므로
+        /// 직진으로 바꿔도 우회 능력을 잃지 않는다.
+        /// </summary>
+        public const float DirectChaseRange = 2f;
+
         private void Execute(Entity self, ref LocalTransform transform, in EnemyMovement movement, in HitRadius radius)
         {
             float2 position = transform.Position.xy;
-            float maxStep = movement.Speed * DeltaTime;
+
+            // 지형 속도 배수 (기획서 4.2 — 기름 -20%, 균열 -40%). 밟고 선 칸 기준.
+            float speed = movement.Speed;
+            if (GridWidth > 0)
+            {
+                speed *= TerrainMovement.SpeedMultiplierAt(
+                    Tiles, GridWidth, GridHeight, GridOrigin, position, isPlayer: false);
+            }
+
+            float maxStep = speed * DeltaTime;
 
             // 2D 게임이라 Z 는 추격 방향에 반영하지 않는다 (xy 만 사용).
             float2 toTarget = Target - position;
@@ -123,6 +190,18 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                 {
                     chase *= distance / maxStep;
                 }
+
+                // 1-a) 흐름장이 있으면 **바위를 우회하는 방향**으로 바꾼다 (ISSUE-013).
+                // 직진 추격은 바위를 정면으로 만나면 그 자리에 끼인다 — 축 분리 미끄러짐으로는
+                // 해결되지 않는다(막힌 축을 버리면 남는 이동량이 0). 필드는 "돌아가는 쪽" 을 알려준다.
+                if (HasFlow && distance > DirectChaseRange)
+                {
+                    float2 flow = FlowDirectionAt(position);
+                    if (!flow.Equals(float2.zero))
+                    {
+                        chase = flow;
+                    }
+                }
             }
 
             // 2) 분리 — 겹친 이웃에게서 멀어지는 방향의 합
@@ -136,7 +215,28 @@ namespace Assets.MyAssets.Scripts.Runtime.Enemy
                 direction /= math.sqrt(lengthSquared);
             }
 
-            transform.Position.xy += direction * maxStep;
+            float2 destination = position + direction * maxStep;
+
+            // 4) 바위 통과 불가 (기획서 4.2). 벽을 따라 미끄러진다 — 경로탐색이 없는 직진 추격이라
+            //    단순히 멈추면 바위 뒤의 적이 플레이어에게 영영 도달하지 못한다 (2026-09-18 결정).
+            if (GridWidth > 0)
+            {
+                destination = TerrainMovement.SlideAlongWalls(
+                    Tiles, GridWidth, GridHeight, GridOrigin, position, destination);
+            }
+
+            transform.Position.xy = destination;
+        }
+
+        /// <summary>
+        /// 이 위치에서 플레이어 쪽으로 가는 방향. 거리 필드의 **기울기**로 구하므로 연속값이다
+        /// (8 방향 양자화가 없다 — ISSUE-014).
+        /// 맵 밖이거나 도달 불가 칸이면 <c>float2.zero</c> (호출자가 직진으로 되돌아간다).
+        /// </summary>
+        private float2 FlowDirectionAt(float2 position)
+        {
+            int2 cell = (int2)math.floor((position - GridOrigin) / TerrainGrid.TileSize);
+            return FlowField.DirectionAt(Flow, GridWidth, GridHeight, cell);
         }
 
         /// <summary>
