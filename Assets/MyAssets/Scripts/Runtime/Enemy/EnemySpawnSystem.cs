@@ -2,7 +2,6 @@ using Assets.MyAssets.Scripts.Runtime.Pooling;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Rendering;
 
 namespace Assets.MyAssets.Scripts.Runtime.Enemy
 {
