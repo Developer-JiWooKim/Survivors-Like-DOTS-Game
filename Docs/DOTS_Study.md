@@ -14,13 +14,40 @@
 
 ---
 
+## 📍 현재 위치 (세션 이어갈 때 여기부터)
+
+> 단계를 마치거나 세션을 끝낼 때마다 이 블록을 갱신한다.
+
+| | |
+|---|---|
+| **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02) |
+| **지금** | **3단계 — 플레이어 추격.** 과제 명세(3.1, 3.2절)까지 전달함. **사용자는 아직 코드를 한 줄도 쓰지 않았다** (`Scripts/Step03/` 없음) |
+| **다음 행동** | 사용자가 3.2절 과제를 작성 → Claude 가 리뷰. 추천 순서: 컴포넌트 3개 → Authoring 2개 → `StudyPlayerMoveSystem` (플레이어만 먼저 확인) → `ChaseSystem` |
+| **본 작업** | M3 는 학습이 끝날 때까지 멈춤. 상태는 [WorkLog.md](WorkLog.md) 의 현재 위치 블록 참조 |
+
+### Claude 가 지킬 진행 규칙 (사용자와 합의한 것, 2026-10-01)
+
+새 세션의 Claude 는 이 대화를 모른다. 아래를 그대로 따른다.
+
+1. **DOTS 코드는 사용자가 직접 쓴다.** Claude 는 `DOTS_Study/Scripts/StepXX/` 의 `.cs` 를 작성·수정하지 않는다. Claude 가 만드는 건 셋업(asmdef)과 이 노트뿐이다.
+2. **정답 코드를 먼저 주지 않는다.** 순서는 힌트 → 할 일을 번호로 쪼갠 절차 → (그래도 막히면) 해당 한두 줄의 문법 예시. 처음 보는 API 문법은 보여 줘도 된다. 설계 판단이 들어간 부분은 직접 쓰게 한다.
+3. **사용자가 "맞아?" 라고 물으면** 파일을 읽고 `bash Tools/unity-recompile.sh` 로 컴파일을 확인한 뒤, 맞은 줄과 틀린 줄을 나눠 말한다. 틀린 곳은 **왜 틀렸는지와 실행하면 무슨 일이 생기는지**를 설명하고 고치는 건 사용자에게 맡긴다.
+4. **확인 질문은 사용자가 먼저 답한다.** 채점하고, 틀린 답은 "처음 답 → 왜 틀렸나" 를 결과 절에 남긴다. 틀렸다가 고친 과정이 이 노트에서 가장 가치 있는 부분이다.
+5. **단계를 마치면**: 결과 절(X.3)에 작성 경위 · 틀렸다가 고친 것 · 확인 질문 답 · 프로젝트 코드와 비교를 적고, 커리큘럼 표와 위의 현재 위치 블록을 갱신하고, 다음 단계의 개념·과제 절을 쓴다.
+6. **비교용 프로젝트 코드는 과제가 끝난 뒤에** 열어 보게 한다 (먼저 보면 베끼게 된다).
+7. 사용자는 ChatGPT 에도 물어 가며 한다. 괜찮다. 대신 도움받은 부분은 **자기 말로 다시 설명**하게 해서 확인한다.
+8. 에디터 메뉴 경로는 **패키지 소스에서 확인하고** 안내한다. (Entities 6.6 은 예전 버전과 다르다. 예: Archetypes 는 Window → Search → Archetypes. Entities Hierarchy 는 "Deprecated" 표기)
+9. 설명 수준: 사용자는 MonoBehaviour 는 익숙하고 ECS 는 처음이다. struct 복사, 베이킹과 런타임의 구분, "시스템은 데이터만 본다" 에서 자주 막혔다. 새 개념은 이 셋과 연결해 설명하면 잘 통한다.
+
+---
+
 ## 커리큘럼
 
 | 단계 | 개념 | 실습 | 프로젝트에서 쓰인 곳 | 상태 |
 |---|---|---|---|---|
 | 1 | Entity / Component / System, World, 아키타입·청크 | 큐브 회전 | 전체 구조의 기반 | ✅ 2026-10-01 |
-| 2 | Baking 심화, 프리팹 엔티티, Instantiate | N개 스포너 | `EnemyAuthoring`, `EnemySpawnerAuthoring` | ⏳ 진행중 |
-| 3 | 쿼리 (`SystemAPI.Query`, `RefRW`/`RefRO`), 싱글턴 읽기 | 플레이어 추격 | `EnemyChaseSystem` | ⬜ |
+| 2 | Baking 심화, 프리팹 엔티티, Instantiate | N개 스포너 | `EnemyAuthoring`, `EnemySpawnerAuthoring` | ✅ 2026-10-02 |
+| 3 | 태그 컴포넌트, 쿼리 필터, 다른 엔티티 읽기, 시스템 순서, `SystemBase` | 플레이어 추격 | `EnemyChaseSystem`, `PlayerMoveSystem` | ⏳ 진행중 |
 | 4 | Job·Burst (`IJobEntity`, `ScheduleParallel`, 의존성) | 3단계를 병렬로, Profiler 비교 | ISSUE-006 | ⬜ |
 | 5 | 구조적 변경, ECB, Enableable 컴포넌트 | 생성·삭제 vs 풀링 | `Active`, `PoolUtility` | ⬜ |
 | 6 | 싱글턴, 시스템 간 통신 | 데미지 이벤트 | `DamageEventBus`, `TerrainGrid` | ⬜ |
@@ -227,15 +254,172 @@ GameObject 참조(클래스)는 컴포넌트에 못 넣는다. 대신 `public En
 2. `DOTS_Study/Scenes/Step02.unity` + SubScene `Step02_Sub.unity`
 3. SubScene 안에 빈 GameObject `Spawner` 를 만들고 `SpawnerAuthoring` 을 붙인다. 프리팹 칸에는 **Project 창의 프리팹**을 끌어다 넣는다
 4. 개수 100 으로 Play → 확인되면 10,000 으로
-5. Play 중에 **Window → Entities → Archetypes** 를 열어 큐브 아키타입을 찾는다
+5. Play 중에 **Window → Search → Archetypes** 를 열고 `c=RotationSpeed` 로 검색해 큐브 아키타입을 찾는다 (Entities 6.6 에서는 별도 창이 아니라 검색 창 기능이다)
 
 **확인 질문**
 1. Entities Hierarchy 에서 프리팹 엔티티를 찾아보자. 왜 그 엔티티는 회전하지 않는가?
 2. `Spawner` 엔티티의 `TransformUsageFlags` 는 무엇으로 했는가? 왜 그런가?
 3. `state.Enabled = false` 를 빼면 무슨 일이 생기는가? (예상한 뒤 **개수 100 으로** 직접 해 보기)
-4. Archetypes 창에서 큐브 10,000 개가 **청크 몇 개**에 담겼는가? 청크 하나에 엔티티가 몇 개 들어가는가? 예상(16KB ÷ 엔티티 크기)과 맞는가?
+4. Archetypes 검색에서 큐브 10,000 개가 **청크 몇 개**에 담겼는가? 청크 하나에 엔티티가 몇 개 들어가는가? 예상(16KB ÷ 엔티티 크기)과 맞는가?
 5. 위치를 정할 때 `NextFloat2Direction() * NextFloat(0, 반경)` 으로 하면 큐브가 **가운데에 몰린다.** 왜 그런가? 고르게 퍼지게 하려면? (DOTS 가 아니라 수학 문제. 프로젝트의 `RingSampler.cs` 가 같은 문제를 푼다)
 
 ### 2.3 결과 / 배운 것
+
+**완료: 2026-10-02.** 큐브 100개, 10,000개 모두 원 안에 퍼져 각자 다른 속도로 회전하는 것을 확인했다.
+
+**작성 경위** — `Spawner`, `SpawnerAuthoring` 은 혼자 작성하고 리뷰로 고쳤다. `SpawnSystem` 은 단계별 힌트를 받으며 작성했다. 위치 쓰기 한 줄과 sqrt 보정은 예시를 받았고, 나머지는 직접 썼다.
+
+**틀렸다가 고친 것** (가장 가치 있는 부분)
+
+| 처음 쓴 것 | 왜 틀렸나 | 고친 것 |
+|---|---|---|
+| Authoring 이 `_prefab` 을 받기만 하고 Baker 가 안 씀. `Spawner` 에 프리팹 필드 없음 | 런타임에는 GameObject 프리팹이 없다. 베이킹 때 엔티티로 바꿔 ID 를 넘겨야 한다 | `public Entity Prefab` + Baker 에서 `GetEntity(authoring._prefab, Dynamic)` |
+| "프리팹을 `EntityManager` 로 변환한다" 고 생각 | 변환은 **Baker**(베이킹 때), 복제는 **EntityManager**(런타임). 역할이 다르다 | — |
+| `Range = authoring._seed` | 오타. 타입이 맞아 컴파일러가 못 잡는다 | `_range` |
+| `Seed` 가 `int`, 기본값 0 | `Unity.Mathematics.Random` 은 `uint` 를 받고 **시드 0 이면 예외** | `uint`, 기본값 1 |
+| `uint seed = Unity.Mathematics.Random;` | 전역 함수가 아니라 **struct 생성기**다. 만들어서 들고 다녀야 한다 | `var random = new Random(spawner.Seed)` |
+| 속도를 루프 **밖**에서 한 번 뽑음 | 모든 큐브가 같은 값을 받는다 | 생성기는 루프 밖에서 한 번, 값은 루프 안에서 매번 |
+| `LocalTransform.FromRotation(new quaternion(0,0,speed*dt,0))` 로 스포너가 직접 회전시키려 함 | ① 스포너의 일은 **속도 데이터를 적는 것**, 돌리는 건 `RotationSystem` 의 일 ② `SetComponentData` 는 컴포넌트를 **통째로** 덮어써서 앞줄에서 쓴 위치가 사라진다 ③ 쿼터니언 숫자는 각도가 아니다 | `SetComponentData(e, new RotationSpeed { ... })` |
+| "컴포넌트를 추가해야 하나?" | 프리팹에 이미 붙어 있어 복제본도 가지고 태어난다. `Set` 은 값 덮어쓰기(싸다), `Add` 는 구조적 변경(비싸다) | `SetComponentData` 유지 |
+
+**확인 질문 답**
+
+1. 프리팹 엔티티에는 `Prefab` 태그가 붙어 모든 쿼리에서 빠진다. `RotationSystem` 이 건너뛰므로 안 돈다. ✅
+2. `TransformUsageFlags.None`. 스포너는 한 번 생성하고 꺼지며 움직이지 않는다. ✅
+   트레이드오프: `LocalTransform` 이 없어서 **원의 중심이 항상 원점**이다. 씬에서 스포너를 옮겨도 반영되지 않는다.
+3. `Enabled = false` 가 없으면 매 프레임 `Count` 개씩 계속 만든다. ✅
+4. **청크당 64개, 청크 157개** (실측: Chunk Capacity 64, Unused Entities 48 → 157 × 64 = 10,048 = 10,000 + 48).
+   - 예상은 "엔티티 300바이트 가정 → 54개" 였다. 실측 64개에서 역산하면 엔티티 하나가 **약 250바이트**다.
+   - 우리가 붙인 건 `RotationSpeed` 4바이트뿐이다. 나머지는 `LocalTransform`, `LocalToWorld`, 렌더링용 컴포넌트가 차지한다.
+   - 청크당 상한은 128개다 (`TypeManager.MaximumChunkCapacity`). 엔티티가 아무리 작아도 128개를 넘지 않는다.
+   - **프리팹 엔티티는 혼자 청크 하나(16KB)를 쓴다** (Capacity 64, Unused 63). `Prefab` 태그 때문에 아키타입이 달라서다.
+   - 도구 위치: Entities 6.6 에서는 **Window → Search → Archetypes**, 검색어 `c=RotationSpeed`. (예전 버전의 Window → Entities → Archetypes 창은 없어졌다)
+5. 거리를 `NextFloat(0, R)` 로 고르게 뽑으면, 넓이는 거리의 제곱에 비례하므로 안쪽 절반 반경(넓이 25%)에 큐브 50% 가 몰린다.
+   `sqrt(NextFloat(0, 1)) * R` 로 뽑으면 넓이 기준으로 고르게 된다. 적용 전후를 눈으로 비교해 확인했다.
+   (처음에는 답을 몰랐다. 설명을 듣고 적용했다)
+
+**프로젝트 코드와 비교** — [EnemySpawnSystem.cs](../Assets/MyAssets/Scripts/Runtime/Enemy/EnemySpawnSystem.cs)
+
+| | 내 `SpawnSystem` | 프로젝트 `EnemySpawnSystem` |
+|---|---|---|
+| 뼈대 | `RequireForUpdate` → `GetSingleton` → `Instantiate` → `Enabled = false` | **같다** |
+| 만든 뒤 | 위치·속도를 바로 써서 전부 살아 있다 | 아무것도 안 쓴다. 20,000 개를 **꺼진 채로** 만들어만 둔다 (풀) |
+| 켜는 일 | 없음 | 다른 시스템(`EnemySpawnDirectorSystem`)이 시간에 맞춰 켠다 |
+| `Enabled = false` 위치 | 맨 끝 | **맨 앞**. 중간에 `return` 해도 두 번 돌지 않게 |
+| 방어 코드 | 없음 | `Prefab == Entity.Null`, `PoolSize <= 0` 이면 그냥 끝낸다 |
+| 실행 시점 | 기본 (`SimulationSystemGroup`) | `[UpdateInGroup(typeof(InitializationSystemGroup))]` — 게임플레이 시스템보다 먼저 |
+
+"꺼진 채로 만든다" 가 무슨 뜻인지, 왜 그러는지는 5단계(Enableable 컴포넌트)에서 다룬다.
+
+---
+
+## 3단계 — 플레이어 추격
+
+### 3.1 개념
+
+**태그 컴포넌트**
+필드가 없는 빈 `IComponentData` struct. 데이터는 0바이트지만 **아키타입을 가른다.** "이 엔티티는 플레이어다" 같은 표시로 쓴다.
+
+```csharp
+public struct PlayerTag : IComponentData { }
+```
+
+**쿼리 필터**
+값을 읽을 필요는 없고 "가지고 있는지" 만 따질 때 쓴다.
+
+```csharp
+SystemAPI.Query<RefRW<LocalTransform>, RefRO<MoveSpeed>>().WithAll<ChaserTag>()   // ChaserTag 도 있어야 한다
+                                                          .WithNone<PlayerTag>()  // PlayerTag 는 없어야 한다
+```
+
+**다른 엔티티의 데이터 읽기**
+추격자는 **플레이어의 위치**를 알아야 한다. 추격자 10,000 개가 각자 플레이어를 찾으면 낭비다.
+→ 루프 **전에 한 번** 읽어 지역 변수에 담고, 루프 안에서는 그 값을 쓴다.
+
+```csharp
+Entity player = SystemAPI.GetSingletonEntity<PlayerTag>();          // 그 태그를 가진 유일한 엔티티의 ID
+float3 target = SystemAPI.GetComponent<LocalTransform>(player).Position;
+```
+
+**시스템 실행 순서**
+같은 그룹 안에서 시스템 순서는 **지정하지 않으면 보장되지 않는다.**
+추격 시스템이 플레이어 이동보다 먼저 돌면 "한 프레임 전 위치" 를 쫓게 된다.
+
+```csharp
+[UpdateAfter(typeof(StudyPlayerMoveSystem))]
+public partial struct ChaseSystem : ISystem
+```
+
+실제 순서는 Play 중 **Window → Entities → Systems** 에서 볼 수 있다.
+
+**`ISystem` vs `SystemBase`**
+
+| | `ISystem` | `SystemBase` |
+|---|---|---|
+| 형태 | `partial struct` | `partial class` |
+| Burst | ✅ | ❌ |
+| 매니지드 객체 (클래스, `Keyboard.current` 등) | ❌ | ✅ |
+| 언제 | **기본값** | 매니지드 API 를 꼭 써야 할 때만 |
+
+키보드 입력(Input System)은 매니지드 클래스라서 Burst 로 못 읽는다. 그래서 입력을 읽는 시스템만 `SystemBase` 로 만든다.
+
+```csharp
+public partial class StudyPlayerMoveSystem : SystemBase
+{
+    protected override void OnCreate() { RequireForUpdate<PlayerTag>(); }
+    protected override void OnUpdate() { /* SystemAPI.Query 등은 똑같이 쓴다 */ }
+}
+```
+
+**조합 (Composition)**
+추격자 프리팹에 `RotationSpeedAuthoring` 과 `ChaserAuthoring` 을 **둘 다** 붙이면, 그 큐브는 돌면서 쫓아온다.
+1·2단계 코드는 한 줄도 안 고친다. 상속 없이 **컴포넌트를 붙이는 것만으로 행동이 합쳐진다.**
+
+### 3.2 과제
+
+**목표**: WASD 로 움직이는 플레이어 큐브 1개를, 스포너가 만든 추격자 큐브 N개가 쫓아온다.
+
+**작성할 파일** (`DOTS_Study/Scripts/Step03/`, 네임스페이스 `...Scripts.Step03`)
+
+| 파일 | 내용 |
+|---|---|
+| `PlayerTag.cs` | 태그 |
+| `ChaserTag.cs` | 태그 |
+| `MoveSpeed.cs` | `IComponentData`. 초당 이동 거리 `float` 하나. **플레이어와 추격자가 같이 쓴다** |
+| `StudyPlayerAuthoring.cs` | `PlayerTag` + `MoveSpeed` 를 붙인다 |
+| `ChaserAuthoring.cs` | `ChaserTag` + `MoveSpeed` 를 붙인다 |
+| `StudyPlayerMoveSystem.cs` | `SystemBase`. WASD 를 읽어 플레이어를 XY 평면에서 움직인다. 대각선이 더 빠르면 안 된다 |
+| `ChaseSystem.cs` | `ISystem` + Burst. 플레이어 이동 **뒤에** 돈다. 추격자를 플레이어 쪽으로 움직인다 |
+
+**조건**
+- 1·2단계 파일은 **수정하지 않는다.** 스포너를 그대로 재사용한다
+- 아직 Job 은 쓰지 않는다 (4단계에서 `ChaseSystem` 을 Job 으로 바꾼다)
+- Z 는 건드리지 않는다 (2D)
+- 이름이 `Study~` 인 이유: 게임 쪽에 `PlayerAuthoring`, `PlayerMoveSystem` 이 이미 있어서 컴포넌트 추가 메뉴에서 헷갈린다
+
+**API 힌트**
+- `SystemAPI.GetSingletonEntity<T>()`, `SystemAPI.GetComponent<T>(entity)`
+- `.WithAll<T>()`
+- `[UpdateAfter(typeof(X))]`
+- `Keyboard.current.wKey.isPressed` (`using UnityEngine.InputSystem;`)
+- `math.normalizesafe(v)` — 길이 1로. 길이가 0 이면 0 을 돌려준다
+- `transform.ValueRW.Position` — 필드 하나만 바꿀 수 있다 (`ValueRW` 는 복사본이 아니라 참조다)
+
+**씬 작업**
+1. `StudyCube` 프리팹을 복제해 `StudyChaser.prefab` 을 만들고 `ChaserAuthoring` 을 **추가로** 붙인다 (`RotationSpeedAuthoring` 은 그대로 둔다 — 스포너가 `RotationSpeed` 를 쓰기 때문)
+2. `Step03.unity` + SubScene `Step03_Sub.unity`
+3. SubScene 안에 `Spawner` (프리팹 = `StudyChaser`, Count 100) 와 `Player` 큐브 (`StudyPlayerAuthoring`, 색이나 크기를 다르게) 를 둔다
+4. 플레이어 속도 8, 추격자 속도 3 정도로 시작
+5. Play → WASD 로 도망다녀 본다. 확인되면 Count 10,000
+
+**확인 질문**
+1. `ChaserTag` 는 0바이트다. 추격자의 **Chunk Capacity** 는 2단계(64)와 같은가, 다른가? 예상한 뒤 Archetypes 검색으로 확인. `MoveSpeed` 는?
+2. 플레이어도 `MoveSpeed` 를 가진다. `ChaseSystem` 에서 `.WithAll<ChaserTag>()` 를 빼면 무슨 일이 생기는가? (예상한 뒤 해 보기)
+3. `[UpdateAfter]` 를 빼고 Window → Entities → Systems 에서 두 시스템의 순서를 본다. 어떻게 되어 있는가? 순서가 뒤집히면 무엇이 달라지는가?
+4. 플레이어를 가만히 두면 추격자가 플레이어 위치에 도달한다. 그때 `math.normalize` (safe 가 아닌 것) 를 쓰면 무슨 일이 생기는가? (해 보기 — 큐브가 어떻게 되는지 관찰)
+5. 왜 플레이어 이동만 `SystemBase` 이고 추격은 `ISystem` 인가? 전부 `SystemBase` 로 하면 무엇을 잃는가?
+6. 추격자들이 결국 **한 점에 겹친다.** 왜 그런가? 안 겹치게 하려면 각 추격자가 무엇을 알아야 하는가? (답만 생각해 보기. 구현은 7단계)
+
+### 3.3 결과 / 배운 것
 
 > 과제를 마치면 여기에 적는다.
