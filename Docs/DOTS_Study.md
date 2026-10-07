@@ -21,9 +21,10 @@
 | | |
 |---|---|
 | **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02), 3단계 (2026-10-07) |
-| **지금** | **4단계 — Job 과 Burst.** 과제 명세(4.1, 4.2절)까지 작성함. **사용자는 아직 코드를 한 줄도 쓰지 않았다** (`Scripts/Step04/` 없음). 3단계 코드는 미커밋 상태일 수 있다 — `git status` 로 확인 |
-| **다음 행동** | 사용자가 4.2절 과제를 작성 → Claude 가 리뷰. 추천 순서: `JobChaserTag` + `JobChaserAuthoring` → `ChaseJob` → `JobChaseSystem` (`.Run()` 으로 먼저 동작 확인) → 씬 → **측정 A·B·C·D**. Burst 를 끄는 에디터 메뉴 경로는 패키지 소스에서 확인하지 못했다 (Burst 2.0 은 패키지에 에디터 코드가 없음). 그래서 A 는 `[BurstCompile]` 을 주석 처리하는 방법으로 잡았다 |
-| **확인할 것** | 3단계 질문 5번(왜 플레이어 이동만 `SystemBase` 인가)은 처음 답이 틀렸고 설명만 들은 상태다. 4단계를 시작할 때 **자기 말로 다시** 설명하게 한다 |
+| **지금** | **4단계 — Job 과 Burst. 코드와 씬은 끝났고, 측정과 확인 질문이 남았다.** `Scripts/Step04/` 의 4개 파일(`JobChaserTag`, `JobChaserAuthoring`, `ChaseJob`, `JobChaseSystem`)은 리뷰를 마쳤고 컴파일 통과, 에디터 로그 예외 0건. `.Run()` / `.Schedule()` / `.ScheduleParallel()` 세 방식 모두 Step04 씬에서 정상 동작하는 것을 사용자가 확인했다 (2026-10-07). 현재 코드는 `.ScheduleParallel()` 상태 |
+| **다음 행동** | **사용자가 할 일 두 가지.** ① 4.2절 "측정" 표의 **A·B·C·D 네 방식을 Profiler 로 재서** ms 를 알려 준다 (함께: Count, CPU 모델·코어 수, D 에서 `ChaseJob` 이 워커 몇 개로 나뉘었는지). ② 4.2절 **확인 질문 7개**에 답한다 (1·2·4·6번은 Profiler 화면을 보며 답하는 질문). → Claude 가 채점하고 4.3절을 완성한 뒤 5단계 과제를 쓴다 |
+| **측정 메모** | A 는 Step03 씬에서 `ChaseSystem.OnUpdate` 의 `[BurstCompile]` 을 **잠깐** 주석 처리해 잰다 (재고 나서 되돌린다). Burst 를 끄는 에디터 메뉴 경로는 패키지 소스에서 확인하지 못했다 (Burst 2.0 은 패키지에 에디터 코드가 없음). Count 는 A 에서 추격 시스템이 1ms 이상 나오는 값으로 정해 네 번 모두 같게 쓴다. `Step04_Sub` 스포너의 회전 속도는 Min 0 / Max 0 이다 (측정에는 영향 없음) |
+| **확인할 것** | 3단계 질문 5번(왜 플레이어 이동만 `SystemBase` 인가)은 처음 답이 틀렸고 설명만 들은 상태다. **자기 말로 다시** 설명하게 한다. 아직 안 했다 |
 | **본 작업** | M3 는 학습이 끝날 때까지 멈춤. 상태는 [WorkLog.md](WorkLog.md) 의 현재 위치 블록 참조 |
 
 ### Claude 가 지킬 진행 규칙 (사용자와 합의한 것, 2026-10-01)
@@ -621,3 +622,18 @@ Window → Analysis → Profiler, CPU Usage 모듈, 아래쪽을 **Timeline** �
 ### 4.3 결과 / 배운 것
 
 > 과제를 마치면 여기에 적는다. **측정 표를 반드시 포함한다** (방식 / ms / Count / CPU).
+> 아래는 2026-10-07 에 코드까지 끝낸 시점의 중간 기록이다. 측정과 확인 질문이 끝나면 이 절을 완성한다.
+
+**작성 경위 (코드, 2026-10-07)** — `JobChaserTag`, `JobChaserAuthoring`, `JobChaseSystem` 은 혼자 작성했고 고칠 곳이 없었다. `ChaseJob` 은 `Execute` 본문에서 한 번 막혀 "3단계 루프가 바깥에서 가져다 쓴 값을 세어 본다" 는 힌트와 `ValueRO`/`ValueRW` 대응표를 받고 작성했다.
+
+**틀렸다가 고친 것 (코드)**
+
+| 처음 쓴 것 | 왜 고쳤나 | 고친 것 |
+|---|---|---|
+| `Execute` 에서 플레이어 위치를 어디서 가져올지 몰라 본문을 비워 둠 | Job 은 `SystemAPI` 를 못 부른다. `DeltaTime` 과 똑같이 시스템이 읽어 **필드로 넘겨준다** | 필드 추가 |
+| `public LocalTransform targetPosition;` | 동작은 맞다. 다만 위치·회전·스케일을 통째로 받으면서 `.Position` 만 쓴다. Job 의 필드는 "바깥에서 필요로 하는 것" 의 목록이라 **쓰는 것만** 받는다. 이름(Position)과 타입(Transform)도 어긋났고, 표기가 `DeltaTime` 과 달랐다 | `public float3 TargetPosition;` |
+| `Execute` 메서드 위에 `[BurstCompile]` | `IJobEntity` 는 구조체 위의 `[BurstCompile]` 하나로 `Execute` 까지 컴파일된다. 시스템의 `OnCreate`/`OnUpdate` 와 규칙이 다르다 | 삭제 |
+
+**확인한 것** — `.Run()` → `.Schedule()` → `.ScheduleParallel()` 순서로 바꿔 가며 세 방식 모두 3단계와 똑같이 쫓아오는 것을 확인했다. `.Run()` 으로 먼저 본 이유: Job 으로 옮기다 생긴 실수와 병렬화에서 생긴 문제를 분리하기 위해서다.
+
+**남은 것** — 측정 A·B·C·D, 확인 질문 7개, 프로젝트 코드와 비교.
