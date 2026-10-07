@@ -20,9 +20,10 @@
 
 | | |
 |---|---|
-| **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02) |
-| **지금** | **3단계 — 플레이어 추격.** 과제 명세(3.1, 3.2절)까지 전달함. **사용자는 아직 코드를 한 줄도 쓰지 않았다** (`Scripts/Step03/` 없음) |
-| **다음 행동** | 사용자가 3.2절 과제를 작성 → Claude 가 리뷰. 추천 순서: 컴포넌트 3개 → Authoring 2개 → `StudyPlayerMoveSystem` (플레이어만 먼저 확인) → `ChaseSystem` |
+| **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02), 3단계 (2026-10-07) |
+| **지금** | **4단계 — Job 과 Burst.** 과제 명세(4.1, 4.2절)까지 작성함. **사용자는 아직 코드를 한 줄도 쓰지 않았다** (`Scripts/Step04/` 없음). 3단계 코드는 미커밋 상태일 수 있다 — `git status` 로 확인 |
+| **다음 행동** | 사용자가 4.2절 과제를 작성 → Claude 가 리뷰. 추천 순서: `JobChaserTag` + `JobChaserAuthoring` → `ChaseJob` → `JobChaseSystem` (`.Run()` 으로 먼저 동작 확인) → 씬 → **측정 A·B·C·D**. Burst 를 끄는 에디터 메뉴 경로는 패키지 소스에서 확인하지 못했다 (Burst 2.0 은 패키지에 에디터 코드가 없음). 그래서 A 는 `[BurstCompile]` 을 주석 처리하는 방법으로 잡았다 |
+| **확인할 것** | 3단계 질문 5번(왜 플레이어 이동만 `SystemBase` 인가)은 처음 답이 틀렸고 설명만 들은 상태다. 4단계를 시작할 때 **자기 말로 다시** 설명하게 한다 |
 | **본 작업** | M3 는 학습이 끝날 때까지 멈춤. 상태는 [WorkLog.md](WorkLog.md) 의 현재 위치 블록 참조 |
 
 ### Claude 가 지킬 진행 규칙 (사용자와 합의한 것, 2026-10-01)
@@ -47,8 +48,8 @@
 |---|---|---|---|---|
 | 1 | Entity / Component / System, World, 아키타입·청크 | 큐브 회전 | 전체 구조의 기반 | ✅ 2026-10-01 |
 | 2 | Baking 심화, 프리팹 엔티티, Instantiate | N개 스포너 | `EnemyAuthoring`, `EnemySpawnerAuthoring` | ✅ 2026-10-02 |
-| 3 | 태그 컴포넌트, 쿼리 필터, 다른 엔티티 읽기, 시스템 순서, `SystemBase` | 플레이어 추격 | `EnemyChaseSystem`, `PlayerMoveSystem` | ⏳ 진행중 |
-| 4 | Job·Burst (`IJobEntity`, `ScheduleParallel`, 의존성) | 3단계를 병렬로, Profiler 비교 | ISSUE-006 | ⬜ |
+| 3 | 태그 컴포넌트, 쿼리 필터, 다른 엔티티 읽기, 시스템 순서, `SystemBase` | 플레이어 추격 | `EnemyChaseSystem`, `PlayerMoveSystem` | ✅ 2026-10-07 |
+| 4 | Job·Burst (`IJobEntity`, `ScheduleParallel`, 의존성) | 3단계를 병렬로, Profiler 비교 | ISSUE-006, `PlayerPosition` | ⏳ 진행중 |
 | 5 | 구조적 변경, ECB, Enableable 컴포넌트 | 생성·삭제 vs 풀링 | `Active`, `PoolUtility` | ⬜ |
 | 6 | 싱글턴, 시스템 간 통신 | 데미지 이벤트 | `DamageEventBus`, `TerrainGrid` | ⬜ |
 | 7 | NativeContainer, 공간 해시 | 가까운 적 찾기 | `EnemySpatialHash` | ⬜ |
@@ -422,4 +423,201 @@ public partial class StudyPlayerMoveSystem : SystemBase
 
 ### 3.3 결과 / 배운 것
 
-> 과제를 마치면 여기에 적는다.
+**완료: 2026-10-07.** 추격자 100개, 10,000개 모두 일정한 속도로 **돌면서** 플레이어를 쫓아오는 것을 확인했다. 에디터 로그 예외 0건.
+(10-02 에 과제를 받고 5일 쉬었다가 10-07 하루에 작성했다.)
+
+**작성 경위** — 컴포넌트 3개와 Authoring 2개는 혼자 작성하고 리뷰로 고쳤다. `StudyPlayerMoveSystem` 은 한 번 막혀서 "MonoBehaviour 로 쓰던 이동 코드를 옮긴다" 는 절차 안내를 받고 작성했다. `ChaseSystem` 은 `[UpdateAfter(typeof(...))]` 문법 예시를 받았고 나머지는 직접 썼다.
+
+**틀렸다가 고친 것**
+
+| 처음 쓴 것 | 왜 틀렸나 | 고친 것 |
+|---|---|---|
+| 세 컴포넌트 파일에 `using Unity.Entities;` 없음 | `IComponentData` 를 못 찾아 CS0246. **에러 하나가 전체 재컴파일을 막아 1·2단계 씬도 Play 가 안 된다** | `using` 추가 |
+| `new MoveSpeed(){ MoveSpeed = ... }` | 필드 이름은 `Speed` 다. 타입 이름과 필드 이름을 헷갈렸다 | `Speed = ...` |
+| `Entity player = GetSingletonEntity<PlayerTag>()` 를 플레이어 이동 시스템에 씀 | 받아 놓고 안 쓴다. 쿼리가 플레이어를 직접 찾는다. 이 API 는 **남의** 데이터를 읽을 때 쓴다 | 삭제 |
+| A 키 `(0, -1)`, D 키 `(0, 1)` | W·S 와 같은 벡터. `dir.x` 가 항상 0 이라 좌우로 못 가고 A 는 아래, D 는 위로 간다. **타입이 맞아 컴파일러가 못 잡는다** (2단계 `_seed` 오타와 같은 종류) | `(-1, 0)`, `(1, 0)` |
+| `[UpdateAfter(StudyPlayerMoveSystem)]` 를 `OnUpdate` 메서드 위에 | ① 순서는 **시스템 타입**의 속성이라 구조체에 붙인다 ② 어트리뷰트에는 `typeof(...)` 로 넘긴다 | 구조체 위 + `typeof` |
+| `OnUpdate` 에 `[BurstCompile]` 없음 | 구조체에만 붙이면 그 메서드는 Burst 로 컴파일되지 않는다 | 세 군데 모두 |
+| `Position.x = (target.x - pos.x) * speed * dt` | `=` 는 옮기기가 아니라 **덮어쓰기**. 추격자 전부가 첫 프레임에 "플레이어 위치의 약 5%" 지점 한 곳으로 순간이동한다 | `+=` |
+| 방향을 normalize 하지 않음 | `(플레이어 − 나)` 에는 **거리**가 섞여 있다. 먼 추격자는 빠르고 가까운 추격자는 느려져 끝내 도달하지 못한다. `MoveSpeed` 가 "초당 이동 거리" 가 아니게 된다 | `dir.z = 0` → `normalizesafe` → 이동. **Z 를 지우는 것이 normalize 보다 먼저**여야 XY 속도가 줄지 않는다 |
+| (씬) 스포너의 Min/Max 회전 속도를 0 으로 둠 | 프리팹의 `RotationSpeed` 30 을 `SpawnSystem` 의 `SetComponentData` 가 0 으로 덮어썼다. `RotationSystem` 은 돌고 있었지만 매 프레임 0도를 적용했다. **코드는 멀쩡하고 데이터가 틀린** 경우 | 인스펙터에서 값 입력 |
+
+**확인 질문 답**
+
+1. **Chunk Capacity 64 로 2단계와 같다** (실측. 아키타입 2개 = 추격자 + 프리팹 엔티티, 둘 다 64).
+   - 예상은 "같다" 였고 맞았다. 다만 처음 답에는 `MoveSpeed` 에 대한 언급이 없었다.
+   - `ChaserTag` 는 0바이트라 용량에 영향이 없다. `MoveSpeed` 는 엔티티마다 4바이트를 더 쓰지만, 약 250바이트짜리 엔티티에서 64개 경계를 넘기지 못했다.
+2. `.WithAll<ChaserTag>()` (와 `.WithNone<PlayerTag>()`) 를 빼면 **플레이어도 루프에 들어오지만 화면에서는 아무것도 달라지지 않는다** (실측).
+   - 플레이어의 `dir` = 플레이어 위치 − 자기 위치 = 0 → `normalizesafe` 가 0 을 돌려줌 → 이동량 0.
+   - 처음 답 "모든 엔티티에게 실행된다" 는 틀렸다. 쿼리는 여전히 `LocalTransform` + `MoveSpeed` 를 **둘 다 가진** 엔티티만 고른다. 스포너(Transform 없음)와 프리팹 엔티티(`Prefab` 태그)는 들어오지 않는다.
+   - **티가 안 나는 버그**라는 점이 중요하다. 4번과 합쳐지면 터진다.
+3. 추격이 플레이어 이동보다 먼저 돌면 **이전 프레임의 플레이어 위치**를 쫓는다. ✅
+   - 순서는 지정하지 않으면 보장되지 않는다. (`[UpdateAfter]` 를 뺐을 때 Systems 창에서의 실제 순서는 기록하지 못했다)
+4. `math.normalize` 는 길이 0 인 벡터를 0 으로 나눠 **NaN** 을 만든다. Play 하자마자 **모든 큐브가 화면에서 사라졌다.** Entities Hierarchy 에는 그대로 있다 (실측).
+   - 처음 답 "조금씩 이동할 것, safe 가 아니라 완전한 1 이 아니어서" 는 틀렸다. `safe` 는 정밀도와 무관하다. 길이가 0 이 아니면 두 함수의 결과는 같고, **길이 0 일 때만** 갈린다.
+   - 전부가 한꺼번에 사라진 이유 (2번 실험 상태에서 했기 때문): 플레이어가 루프에 들어와 `dir` = 0 → 플레이어 위치가 NaN → 다음 프레임 `targetPosition` 이 NaN → 추격자 1만 개의 `dir` 이 전부 NaN. **NaN 하나가 한 프레임 만에 전체로 번졌다.**
+   - NaN 은 어떤 수를 더해도 NaN 이라 되돌아오지 않는다. 예외도 나지 않는다. 엔티티는 살아 있고 데이터만 망가진다.
+5. 플레이어 이동만 `SystemBase` 인 이유는 `Keyboard.current` 가 **매니지드 클래스**라 Burst 로 읽을 수 없어서다. 전부 `SystemBase` 로 하면 추격 루프(1만 개)의 Burst 를 잃는다.
+   - 처음 답 "플레이어 처리가 먼저 이루어져야 해서" 는 틀렸다. 순서는 `[UpdateAfter]` 가 정하고 시스템 종류와 무관하다. 두 개념(실행 순서 / Burst 가능 여부)을 섞었다.
+6. 모든 추격자가 **같은 한 점**을 목표로 하고 **서로의 위치를 모르기** 때문에 겹친다. ✅
+   안 겹치려면 각자 주변 추격자의 위치를 알아야 한다. 1만 개가 서로를 전부 보면 1억 번이라 "가까운 것만 찾는 방법" 이 필요하다 → 7단계 공간 해시.
+
+**도구에서 겪은 것** — Step03 을 쓰는 내내 VS Code 자동완성과 빨간 줄이 안 나왔다. 원인은 파일이나 csproj 가 아니라 **C# 언어 서버가 떠 있지 않은 것**이었다 (VS Code 재시작 뒤 C# Dev Kit 이 솔루션을 열지 않음. 프로세스 목록에 Roslyn 서버 없음). **Developer: Reload Window** 로 해결. 자동완성이 한꺼번에 안 되면 코드보다 언어 서버를 먼저 의심한다.
+
+**프로젝트 코드와 비교** — [EnemyChaseSystem.cs](../Assets/MyAssets/Scripts/Runtime/Enemy/EnemyChaseSystem.cs), [PlayerMoveSystem.cs](../Assets/MyAssets/Scripts/Runtime/Player/PlayerMoveSystem.cs)
+
+| | 내 코드 | 프로젝트 |
+|---|---|---|
+| 뼈대 | `[UpdateAfter(플레이어 이동)]` → 플레이어 위치를 한 번 읽음 → 추격자 루프 | **같다** |
+| 플레이어 위치 읽기 | `GetSingletonEntity` + `GetComponent<LocalTransform>` | `GetSingleton<PlayerPosition>()` — 위치의 **사본** 컴포넌트를 따로 둔다. 이유는 4단계에서 직접 겪는다 |
+| 루프 | 메인 스레드 `foreach` | `IJobEntity` + `ScheduleParallel` (4단계) |
+| 0 으로 나누기 방지 | `normalizesafe` | `distance > 1e-3f` 일 때만 나눈다. 같은 목적 |
+| 도착 직전 | 한 걸음이 남은 거리보다 커서 플레이어를 지나쳤다 돌아오며 떤다 | `maxStep > distance` 면 남은 거리만큼만 간다 |
+| 겹침 | 한 점에 겹친다 | 공간 해시로 이웃을 찾아 서로 민다 (7단계) |
+| 필터 | `.WithAll<ChaserTag>()` | `[WithAll(typeof(Active))]` — 풀에서 꺼진 적은 건너뛴다 (5단계) |
+| 입력 | 이동 시스템이 키보드를 직접 읽는다 → `SystemBase` | 입력 시스템이 `PlayerInputState` 싱글턴에 써 두고, 이동 시스템은 그걸 읽는다 → 이동은 `ISystem` + Burst (6단계) |
+| 플레이어 쿼리 | `.WithAll<PlayerTag>()` | 태그 없이 `PlayerMovement` 컴포넌트 유무로 고른다. 플레이어만 가진 데이터가 있으면 태그가 필요 없다 |
+
+---
+
+## 4단계 — Job 과 Burst
+
+### 4.1 개념
+
+**지금 `ChaseSystem` 은 어디서 도는가**
+`OnUpdate` 안의 `foreach` 는 **메인 스레드 하나**에서 돈다. CPU 코어가 8개여도 1개만 쓴다.
+Burst 는 그 한 코어에서 도는 코드를 빠르게 만들 뿐이다. **Burst(빠른 코드)와 Job(여러 코어)은 별개다.**
+
+| | 코드가 빠른가 | 코어를 여러 개 쓰는가 |
+|---|---|---|
+| `SystemBase` 의 `foreach` | ❌ | ❌ |
+| `ISystem` + `[BurstCompile]` 의 `foreach` (3단계) | ✅ | ❌ |
+| `[BurstCompile]` Job + `ScheduleParallel` | ✅ | ✅ |
+
+**Job**
+"이 일을 워커 스레드에서 해 달라" 고 맡기는 **struct**. 필드에 필요한 데이터를 담고, `Execute` 에 할 일을 쓴다.
+
+**`IJobEntity`**
+쿼리에 맞는 엔티티마다 `Execute` 가 한 번씩 불리는 Job. **`Execute` 의 매개변수가 곧 쿼리다.**
+
+```csharp
+[BurstCompile]
+public partial struct SpinJob : IJobEntity
+{
+    public float DeltaTime;                                   // 시스템이 채워서 넘긴다
+
+    private void Execute(ref LocalTransform transform, in RotationSpeed speed)
+    {
+        transform = transform.RotateZ(speed.RadiansPerSecond * DeltaTime);
+    }
+}
+```
+
+| `foreach` 에서 | Job 에서 |
+|---|---|
+| `RefRW<LocalTransform>` | `ref LocalTransform` |
+| `RefRO<RotationSpeed>` | `in RotationSpeed` |
+| `.WithAll<T>()` | 구조체 위에 `[WithAll(typeof(T))]` |
+| `transform.ValueRW.Position` | `transform.Position` (`Ref` 포장이 없다) |
+
+**Job 은 `SystemAPI` 를 못 부른다**
+Job 은 시스템 밖 다른 스레드에서 돈다. `SystemAPI.Time.DeltaTime` 이나 `GetSingletonEntity` 를 쓸 수 없다.
+→ 필요한 값은 시스템이 **메인 스레드에서 미리 읽어 필드에 담아** 넘긴다. struct 복사다.
+
+**맡기는 세 가지 방법**
+
+```csharp
+new SpinJob { DeltaTime = dt }.Run();               // 메인 스레드에서 지금 바로. foreach 와 같다
+new SpinJob { DeltaTime = dt }.Schedule();          // 워커 스레드 1개에 맡긴다
+new SpinJob { DeltaTime = dt }.ScheduleParallel();  // 청크를 워커 여러 개에 나눠 맡긴다
+```
+
+`Schedule` 과 `ScheduleParallel` 은 **예약만 하고 바로 돌아온다.** `OnUpdate` 가 끝난 시점에 일은 아직 안 끝났을 수 있다.
+
+**왜 청크 단위로 나누는가**
+`ScheduleParallel` 은 엔티티가 아니라 **청크**를 워커에 나눠 준다. 1만 개 = 청크 157개 → 워커들이 나눠 가진다.
+각 워커가 서로 다른 청크(서로 다른 메모리)를 만지므로 충돌하지 않는다. 1단계의 청크 구조가 여기서 쓰인다.
+
+**안전 시스템 — `ref` 와 `in` 이 중요한 이유**
+두 스레드가 같은 데이터에 동시에 쓰면 값이 깨진다(데이터 레이스). ECS 는 Job 마다 **어떤 컴포넌트를 읽고 쓰는지**를 보고 판단한다.
+
+- 둘 다 **읽기만** 한다 → 동시에 돌려도 된다
+- 하나라도 **쓴다** → 앞의 Job 이 끝난 뒤에 돌린다
+
+이 판단 재료가 `ref`(쓴다) / `in`(읽는다) 이다. 읽기만 하면서 `ref` 로 받으면 ECS 가 "쓴다" 고 보고 불필요하게 줄을 세운다.
+→ **1단계 확인 질문 4번("왜 `RefRO` 로 받는가")의 답이 이것이다.**
+
+**의존성 (`state.Dependency`)**
+시스템마다 "내가 예약한 Job" 의 핸들이 `state.Dependency` 에 들어 있다. ECS 가 이걸 보고 Job 들의 순서를 엮는다.
+`IJobEntity` 를 인자 없이 `Schedule()` / `ScheduleParallel()` 하면 이 연결을 **자동으로** 해 준다. 지금은 이것만 알면 된다.
+
+**메인 스레드에서 읽으면 기다린다**
+Job 이 `LocalTransform` 에 쓰는 중인데 메인 스레드가 `LocalTransform` 을 읽으려 하면, 그 Job 이 **끝날 때까지 메인 스레드가 멈춰 기다린다** (동기화 지점).
+`SystemAPI.GetComponent`, `SystemAPI.Query` 의 `foreach` 가 이 기다림을 자동으로 건다.
+→ 이번 과제에서 직접 보게 된다. 프로젝트의 ISSUE-006 과 `PlayerPosition` 이 여기서 나왔다.
+
+**측정은 Profiler 로**
+"Job 으로 바꿨으니 빨라졌다" 는 측정 전에는 말할 수 없다. 엔티티가 적으면 Job 을 예약하는 비용이 더 클 수도 있다.
+Window → Analysis → Profiler, CPU Usage 모듈, 아래쪽을 **Timeline** 으로 두면 메인 스레드와 워커 스레드가 줄별로 보인다.
+
+### 4.2 과제
+
+**목표**: 추격 루프를 Job 으로 옮기고, **네 가지 방식의 시간을 Profiler 로 재서 표로 남긴다.**
+
+**작성할 파일** (`DOTS_Study/Scripts/Step04/`, 네임스페이스 `...Scripts.Step04`)
+
+| 파일 | 내용 |
+|---|---|
+| `JobChaserTag.cs` | 태그. 4단계용 추격자 표시 |
+| `JobChaserAuthoring.cs` | `JobChaserTag` + `MoveSpeed`(3단계 것) 를 붙인다 |
+| `ChaseJob.cs` | `IJobEntity`. 3단계 `ChaseSystem` 의 루프 본문을 `Execute` 로 옮긴다 |
+| `JobChaseSystem.cs` | `ISystem` + Burst. 플레이어 위치와 `deltaTime` 을 읽어 Job 에 담고 예약한다 |
+
+**태그를 새로 만드는 이유**
+3단계 파일은 수정하지 않는다. 그런데 새 시스템이 `ChaserTag` 를 쓰면 3단계 `ChaseSystem` 과 **둘 다 돌아서 두 배로 움직인다.**
+4단계 추격자에 `JobChaserTag` 만 붙이면, 3단계 시스템은 `RequireForUpdate<ChaserTag>` 에 걸려 저절로 꺼진다.
+덤으로 Step03 씬(메인 스레드)과 Step04 씬(Job)이 둘 다 살아 있어 **언제든 다시 비교**할 수 있다.
+
+**조건**
+- 1·2·3단계 파일은 수정하지 않는다. `PlayerTag`, `MoveSpeed`, `StudyPlayerAuthoring`, `StudyPlayerMoveSystem`, 스포너는 그대로 재사용한다
+- `ChaseJob` 안에 숫자를 박지 않는다. 필요한 값은 전부 필드로 받는다
+- 측정 전에는 "빨라졌다" 고 적지 않는다
+
+**API 힌트**
+- `partial struct X : IJobEntity`, `private void Execute(ref A a, in B b)`
+- `[WithAll(typeof(T))]` — Job 구조체 위에
+- `new X { ... }.Run()` / `.Schedule()` / `.ScheduleParallel()`
+- `using Assets.MyAssets.DOTS_Study.Scripts.Step03;` — 3단계 컴포넌트를 쓰려면
+
+**씬 작업**
+1. `StudyChaser` 를 복제해 `StudyJobChaser.prefab` 을 만든다. `ChaserAuthoring` 을 **떼고** `JobChaserAuthoring` 을 붙인다 (Move Speed 3)
+2. `Step04.unity` + SubScene `Step04_Sub.unity`. 안에 `Player` 와 `Spawner` (프리팹 = `StudyJobChaser`, 회전 속도 Min/Max 를 0 이 아닌 값으로)
+3. Play 해서 3단계와 똑같이 쫓아오는지 먼저 확인한다
+
+**측정** — 이 단계의 본체
+
+| # | 방식 | 어떻게 만드는가 |
+|---|---|---|
+| A | 메인 스레드, Burst 없음 | Step03 씬. `ChaseSystem.OnUpdate` 의 `[BurstCompile]` 한 줄을 **잠깐** 주석 처리 (재고 나서 되돌린다) |
+| B | 메인 스레드, Burst | Step03 씬 그대로 |
+| C | Job, 워커 1개 | Step04 씬. `.Schedule()` |
+| D | Job, 워커 여러 개 | Step04 씬. `.ScheduleParallel()` |
+
+- 네 번 모두 **같은 조건**: 같은 Count, 같은 해상도, 에디터 Play 모드, 플레이어는 가만히
+- Count 는 A 에서 추격 시스템이 **1ms 이상** 나오는 값으로 정한다 (10,000 으로 안 보이면 50,000 → 100,000 으로 올린다). 정한 값을 기록한다
+- 재는 값: Profiler Timeline 에서 추격 시스템(또는 `ChaseJob`)이 차지한 **ms**. 30프레임쯤 보고 대표값을 적는다
+- C·D 에서는 **워커 스레드 줄**에 `ChaseJob` 이 몇 개로 쪼개져 보이는지도 본다
+- 함께 기록: CPU 모델과 코어 수, Count
+
+**확인 질문**
+1. A → B 는 몇 배 빨라졌는가? B → D 는? 코어 수만큼 빨라졌는가? 아니라면 왜 그럴 것 같은가?
+2. C(`Schedule`)와 B(메인 스레드 Burst)는 **한 스레드가 같은 일을 한다.** 시간이 같은가? 다르다면 메인 스레드는 그동안 무엇을 하고 있는가? (Timeline 에서 보기)
+3. `ChaseJob.Execute` 의 `in MoveSpeed` 를 `ref MoveSpeed` 로 바꿔도 동작은 같다. 무엇을 잃는가? (4.1 의 안전 시스템 절. 1단계 질문 4번의 답)
+4. D 에서 Timeline 의 메인 스레드를 본다. `ChaseJob` 을 예약한 **뒤에 도는** 시스템 중에 `LocalTransform` 을 메인 스레드에서 만지는 것이 있다. 무엇이고, 그 시스템 줄에 무엇이 보이는가? (힌트: 1단계에서 만든 것)
+5. `JobChaseSystem` 은 매 프레임 `SystemAPI.GetComponent<LocalTransform>(player)` 로 플레이어 위치를 읽는다. 이 줄이 **지난 프레임에 예약한** `ChaseJob` 과 어떤 관계인가? 프로젝트가 `PlayerPosition` 이라는 사본을 따로 둔 이유를 추측해 보기
+6. Count 를 100 으로 내리고 B 와 D 를 다시 잰다. 여전히 D 가 빠른가? 이 결과가 "항상 Job 으로 바꾸면 좋다" 에 대해 말해 주는 것은?
+7. `ChaseJob` 에 `Random` 필드를 하나 두고 `Execute` 에서 `NextFloat` 을 부른다고 하자. `ScheduleParallel` 에서 무슨 문제가 생기는가? (답만 생각해 보기)
+
+### 4.3 결과 / 배운 것
+
+> 과제를 마치면 여기에 적는다. **측정 표를 반드시 포함한다** (방식 / ms / Count / CPU).
