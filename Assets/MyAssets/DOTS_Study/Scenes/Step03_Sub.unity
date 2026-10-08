@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Survivors.Study::Assets.MyAssets.DOTS_Study.Scripts.Step02.SpawnerAuthoring
   _prefab: {fileID: 7936997731312259116, guid: c14557bb2c19a99499334df7e15ffc95, type: 3}
-  _count: 10000
+  _count: 50000
   _seed: 1
   _range: 10
   _minRadiansPerSecond: 30

@@ -20,11 +20,11 @@
 
 | | |
 |---|---|
-| **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02), 3단계 (2026-10-07) |
-| **지금** | **4단계 — Job 과 Burst. 코드와 씬은 끝났고, 측정과 확인 질문이 남았다.** `Scripts/Step04/` 의 4개 파일(`JobChaserTag`, `JobChaserAuthoring`, `ChaseJob`, `JobChaseSystem`)은 리뷰를 마쳤고 컴파일 통과, 에디터 로그 예외 0건. `.Run()` / `.Schedule()` / `.ScheduleParallel()` 세 방식 모두 Step04 씬에서 정상 동작하는 것을 사용자가 확인했다 (2026-10-07). 현재 코드는 `.ScheduleParallel()` 상태 |
-| **다음 행동** | **사용자가 할 일 두 가지.** ① 4.2절 "측정" 표의 **A·B·C·D 네 방식을 Profiler 로 재서** ms 를 알려 준다 (함께: Count, CPU 모델·코어 수, D 에서 `ChaseJob` 이 워커 몇 개로 나뉘었는지). ② 4.2절 **확인 질문 7개**에 답한다 (1·2·4·6번은 Profiler 화면을 보며 답하는 질문). → Claude 가 채점하고 4.3절을 완성한 뒤 5단계 과제를 쓴다 |
-| **측정 메모** | A 는 Step03 씬에서 `ChaseSystem.OnUpdate` 의 `[BurstCompile]` 을 **잠깐** 주석 처리해 잰다 (재고 나서 되돌린다). Burst 를 끄는 에디터 메뉴 경로는 패키지 소스에서 확인하지 못했다 (Burst 2.0 은 패키지에 에디터 코드가 없음). Count 는 A 에서 추격 시스템이 1ms 이상 나오는 값으로 정해 네 번 모두 같게 쓴다. `Step04_Sub` 스포너의 회전 속도는 Min 0 / Max 0 이다 (측정에는 영향 없음) |
-| **확인할 것** | 3단계 질문 5번(왜 플레이어 이동만 `SystemBase` 인가)은 처음 답이 틀렸고 설명만 들은 상태다. **자기 말로 다시** 설명하게 한다. 아직 안 했다 |
+| **완료** | 1단계 (2026-10-01), 2단계 (2026-10-02), 3단계 (2026-10-07), 4단계 (2026-10-08) |
+| **지금** | **5단계 — 구조적 변경, ECB, Enableable 컴포넌트.** 과제 명세(5.1, 5.2절)까지 작성함. **사용자는 아직 코드를 한 줄도 쓰지 않았다** (`Scripts/Step05/` 없음). 5.2절은 파일 구조를 일부러 느슨하게 줬다 — **설계는 사용자가 하고 Claude 는 리뷰한다** |
+| **다음 행동** | 사용자가 5.1절을 읽고 5.2절 과제를 설계·작성 → Claude 가 리뷰. 막히면 4단계 때처럼 "MonoBehaviour 로 쓰던 것을 옮긴다" 식의 절차 안내부터 준다. 측정은 Profiler 로 하되 **Clear 를 누르고**, Play 후 10초 기다린 뒤 뒤쪽 프레임에서 읽는다. 필요하면 Claude 가 저장된 `.data` 캡처를 에디터에 불러 Profiler API 로 읽어 줄 수 있다 (4.3절의 "측정 방법" 참조) |
+| **측정 메모** | 4단계에서 **CPU 모델·코어 수와 Jobs 메뉴 상태(Safety Checks 등)를 기록하지 못했다.** 5단계 측정에서는 첫 측정 전에 같이 적는다. 4단계 확인 질문 6번(Count 100 에서 B 와 D)은 **측정하지 않고** 예상으로만 답했다 — 선택 사항으로 남아 있다 |
+| **확인할 것** | 4단계 7번(`Random` 을 병렬 잡에서 쓰면 생기는 문제)은 처음 답이 틀렸고 설명만 들은 상태다. 5단계 시작할 때 **자기 말로 다시** 설명하게 한다 |
 | **본 작업** | M3 는 학습이 끝날 때까지 멈춤. 상태는 [WorkLog.md](WorkLog.md) 의 현재 위치 블록 참조 |
 
 ### Claude 가 지킬 진행 규칙 (사용자와 합의한 것, 2026-10-01)
@@ -40,6 +40,7 @@
 7. 사용자는 ChatGPT 에도 물어 가며 한다. 괜찮다. 대신 도움받은 부분은 **자기 말로 다시 설명**하게 해서 확인한다.
 8. 에디터 메뉴 경로는 **패키지 소스에서 확인하고** 안내한다. (Entities 6.6 은 예전 버전과 다르다. 예: Archetypes 는 Window → Search → Archetypes. Entities Hierarchy 는 "Deprecated" 표기)
 9. 설명 수준: 사용자는 MonoBehaviour 는 익숙하고 ECS 는 처음이다. struct 복사, 베이킹과 런타임의 구분, "시스템은 데이터만 본다" 에서 자주 막혔다. 새 개념은 이 셋과 연결해 설명하면 잘 통한다.
+10. 측정 안내 (4단계에서 겪은 것): Profiler **Timeline 보기에는 검색창이 없다.** 이름 검색은 **Hierarchy 보기**에 있다 (스레드 드롭다운으로 워커를 바꿔 가며 본다). 방식을 바꿀 때마다 **Clear** 를 누르지 않으면 이전 기록이 그래프에 남아 값이 섞인다. 앞쪽 프레임에는 Job 이 안 보일 수 있다 (예약한 프레임과 실행되는 프레임이 다르다). Burst 는 에디터에서 백그라운드로 컴파일되니 Play 후 10초쯤 기다린 뒤 잰다.
 
 ---
 
@@ -50,8 +51,8 @@
 | 1 | Entity / Component / System, World, 아키타입·청크 | 큐브 회전 | 전체 구조의 기반 | ✅ 2026-10-01 |
 | 2 | Baking 심화, 프리팹 엔티티, Instantiate | N개 스포너 | `EnemyAuthoring`, `EnemySpawnerAuthoring` | ✅ 2026-10-02 |
 | 3 | 태그 컴포넌트, 쿼리 필터, 다른 엔티티 읽기, 시스템 순서, `SystemBase` | 플레이어 추격 | `EnemyChaseSystem`, `PlayerMoveSystem` | ✅ 2026-10-07 |
-| 4 | Job·Burst (`IJobEntity`, `ScheduleParallel`, 의존성) | 3단계를 병렬로, Profiler 비교 | ISSUE-006, `PlayerPosition` | ⏳ 진행중 |
-| 5 | 구조적 변경, ECB, Enableable 컴포넌트 | 생성·삭제 vs 풀링 | `Active`, `PoolUtility` | ⬜ |
+| 4 | Job·Burst (`IJobEntity`, `ScheduleParallel`, 의존성) | 3단계를 병렬로, Profiler 비교 | ISSUE-006, `PlayerPosition` | ✅ 2026-10-08 |
+| 5 | 구조적 변경, ECB, Enableable 컴포넌트 | 생성·삭제 vs 풀링 | `Active`, `PoolUtility` | ⏳ 진행중 |
 | 6 | 싱글턴, 시스템 간 통신 | 데미지 이벤트 | `DamageEventBus`, `TerrainGrid` | ⬜ |
 | 7 | NativeContainer, 공간 해시 | 가까운 적 찾기 | `EnemySpatialHash` | ⬜ |
 
@@ -621,8 +622,7 @@ Window → Analysis → Profiler, CPU Usage 모듈, 아래쪽을 **Timeline** �
 
 ### 4.3 결과 / 배운 것
 
-> 과제를 마치면 여기에 적는다. **측정 표를 반드시 포함한다** (방식 / ms / Count / CPU).
-> 아래는 2026-10-07 에 코드까지 끝낸 시점의 중간 기록이다. 측정과 확인 질문이 끝나면 이 절을 완성한다.
+**완료: 2026-10-08.** 코드는 10-07, 측정과 확인 질문은 10-08 에 마쳤다. Count 50,000 에서 네 방식을 모두 재서 표로 남겼다.
 
 **작성 경위 (코드, 2026-10-07)** — `JobChaserTag`, `JobChaserAuthoring`, `JobChaseSystem` 은 혼자 작성했고 고칠 곳이 없었다. `ChaseJob` 은 `Execute` 본문에서 한 번 막혀 "3단계 루프가 바깥에서 가져다 쓴 값을 세어 본다" 는 힌트와 `ValueRO`/`ValueRW` 대응표를 받고 작성했다.
 
@@ -636,4 +636,150 @@ Window → Analysis → Profiler, CPU Usage 모듈, 아래쪽을 **Timeline** �
 
 **확인한 것** — `.Run()` → `.Schedule()` → `.ScheduleParallel()` 순서로 바꿔 가며 세 방식 모두 3단계와 똑같이 쫓아오는 것을 확인했다. `.Run()` 으로 먼저 본 이유: Job 으로 옮기다 생긴 실수와 병렬화에서 생긴 문제를 분리하기 위해서다.
 
-**남은 것** — 측정 A·B·C·D, 확인 질문 7개, 프로젝트 코드와 비교.
+**측정** — 에디터 Play 모드, Count 50,000, 플레이어 정지. Burst 는 A 만 껐다.
+
+| # | 방식 | 측정 대상 | 값 | 출처 |
+|---|---|---|---|---|
+| A | 메인 스레드, Burst 없음 (Step03) | `ChaseSystem` | **4.36 ms** | Profiler 에서 직접 읽음 |
+| B | 메인 스레드, Burst (Step03) | `ChaseSystem` | **0.28 ms** | 직접 |
+| C | Job `.Schedule()`, 워커 1개 (Step04) | `ChaseJob` | **0.29 ms** (`JobChaseSystem` 메인 스레드 ≈ 0) | 직접. 캡처는 남기지 않았다 |
+| D | Job `.ScheduleParallel()` (Step04) | `ChaseJob` 전체 길이 | **0.114 ms** (0.096~0.130) | 저장한 `.data` 캡처를 에디터에 불러 Profiler API 로 읽음. 41프레임 중앙값 |
+
+- 배율: A→B **약 15.6배**, B→D **약 2.5배**, B 와 C 는 사실상 같다 (0.28 vs 0.29).
+- 참고: Count 10,000 일 때 A 는 약 0.85 ms. 5배(0.85→4.36 = 5.1배)에 정비례한다.
+- D 의 내역 (캡처, 중앙값): `ChaseJob (Burst)` 조각 **14개** (워커 15개 중), 가장 긴 조각 0.113 ms, **조각 합계 1.110 ms**, `JobChaseSystem` 메인 스레드 **0.008 ms**.
+- **기록하지 못한 조건**: CPU 모델·코어 수 (워커가 15개이니 논리 프로세서 16개로 *추정*), Jobs 메뉴의 Safety Checks / Leak Detection 상태. 에디터의 안전 검사가 켜져 있으면 Job 시간이 늘어나므로 **절대값보다 배율로 읽는다.** 빌드에서는 다를 수 있다.
+- 두 캡처 파일은 수치가 소수점 셋째 자리까지 같았다 (같은 세션을 두 번 저장한 것으로 보인다). 그래서 D 한 가지만 확인된 셈이다.
+
+**측정에서 관찰한 것**
+
+1. **워커들이 동시에 시작하지 않는다.** 프레임 574 에서 첫 조각이 시작한 시점을 0 으로 두면 조각 2개는 0.000 ms, 2개는 +0.019 ms, 10개는 +0.056 ms 에 시작했다 (프레임 700 도 같은 모양). 10개는 전체 길이의 절반 가까이가 지난 뒤에 합류했다. 모든 조각이 거의 같은 시각(약 0.12 ms)에 끝난다 — 일이 다 떨어질 때까지 같이 가져가다 함께 끝나는 모양이다.
+2. **조각 합계(1.11 ms)가 한 스레드가 혼자 하던 시간(0.29 ms)의 약 3.8배다.** 이유는 이 데이터로 풀리지 않았다. 후보는 같은 시간대에 렌더링 Job 이 워커를 함께 쓴다, 일이 작아 시작·동기화의 고정 비용 비중이 크다, 물리 코어 수와 메모리 대역폭의 한계다. **측정으로 확인하지 못한 가설**이다.
+3. **같은 프레임에 `ChaseJob` 말고도 큰 Job 이 많다.** `FrustumCullingJob`, `EmitDrawCommandsJob`, `ExecuteGpuUploads`, `LocalToWorldSystem` 의 Job 들이 워커를 훨씬 오래 쓴다 (프레임 574 합계 5~6 ms). 스크린샷의 큰 초록 덩어리(0.8~1.06 ms)는 `ChaseJob` 이 아니라 이것들이었다.
+4. **`RotationSystem` 이 `ChaseJob` 을 기다린다.** `JobChaseSystem` 이 끝나고 0.011 ms 뒤에 `RotationSystem` 이 시작하고, 그 한 줄(0.86 ms) 안에 `JobHandle.Complete` / `WaitForJobGroupID` (약 0.13 ms)가 있다. 기다리는 동안 메인 스레드가 `ChaseJob (Burst)` 조각 하나(0.12 ms)를 직접 실행하는 것도 보였다 (프레임 574, 700, 900 에서 같은 모양).
+
+**측정 방법 (다음에 재현하려면)** — Profiler 로 직접 읽은 값은 **Hierarchy 보기**에서 읽었다 (Timeline 에는 검색창이 없다). `Job.Worker` 는 스레드 그룹이 `Job` 이다. D 의 상세 수치는 Profiler 창에서 **Save** 한 `ProfilerCaptures/*.data` 를 에디터에서 `ProfilerDriver.LoadProfile` 로 불러 `GetRawFrameDataView` 로 샘플(이름·시작·길이)을 읽어 구했다 (`unity command eval_file`). 이때 에디터 Profiler 창의 기존 기록은 교체된다. Job 샘플 이름은 `ChaseJob (Burst)`, 시스템 샘플 이름은 `Default World …Step04.JobChaseSystem` 처럼 월드 이름이 앞에 붙는다.
+
+**확인 질문 답**
+
+| # | 처음 답 | 판정 · 왜 | 정리한 답 |
+|---|---|---|---|
+| 1 | A→B 약 16배, B→D 약 2배. A→B 는 "컴파일을 백그라운드로 훨씬 빠르게 하는 Burst 를 적용해서" | 수치 ✅ (B→D 는 2.5배). **"백그라운드로" ✗** — 에디터에서 Burst 컴파일이 백그라운드로 도는 것과 빨라지는 이유는 별개다. Burst 는 C# 을 최적화된 네이티브 코드로 바꾸는 컴파일러다 | 15.6배 / 2.5배 |
+| 1' | "한 코어가 처리하는 청크는 한 개라서, 청크가 많으면 효율이 높고 적으면 차이가 없다" | 결론의 방향은 맞지만 **전제 ✗**: 한 워커는 청크를 **여러 개** 처리한다 (5만 개 ÷ 용량 64 ≈ 780청크, 조각 하나가 평균 50개쯤). 이 측정은 청크가 워커보다 훨씬 많아서 **청크 부족이 원인이 아니다** | 이 생각은 6번으로 옮겼다 |
+| 1'' | "코어 수만큼 빨라졌는가? yes" | 질문을 **"코어가 많으면 빨라지는가?"** 로 읽은 것이었다. 문서 원문은 "코어 수**만큼**" 이라 답은 **아니오** | 빨라지긴 했다(2.5배). 코어 수 15배에는 못 미친다. 원인 하나는 **시작 지연**(관찰 1). 나머지는 미확인 |
+| 2 | "시간이 비슷하게 측정됐음" | 앞 절반 ✅ (0.28 vs 0.29). 뒤 절반(메인 스레드는 그동안 무엇을?)은 처음에 "다른 일 아닌가?" | 예약 직후 기다리지 않고 다음 시스템으로 넘어가지만, **바로 다음 `RotationSystem` 이 같은 `LocalTransform` 에 쓰려다 기다린다.** 그래서 이 순서에서는 Job 으로 옮겨도 메인 스레드가 노는 이득을 거의 못 본다. (D 캡처 기준. C 는 캡처하지 않아 미루어 본 것) |
+| 3 | `in` 은 읽기만 하니 여러 스레드가 접근 가능, `ref` 는 쓰기라 한 스레드가 읽는 동안 다른 스레드가 못 접근해 지연된다 | ✅. 보정: 제약은 **서로 다른 Job·시스템 사이**의 일이다. 한 Job 안의 워커들은 `ref` 여도 서로 다른 청크를 처리해 막지 않는다. "느려진다" 는 Job 이 느려지는 게 아니라 **시작을 기다린다** 는 뜻 | 1단계 질문 4번(왜 `RefRO`)의 답이기도 하다 |
+| 4 | "엔티티의 이동을 처리하는 ChaseJob" → "SystemAPI 로 엔티티들을 쿼리에 읽어와 처리하기 때문에?" → "모르겠어" | **✗ 둘 다.** 질문은 "예약한 뒤에 도는 시스템 중 메인 스레드에서 `LocalTransform` 을 만지는 것" 이고 답은 **`RotationSystem`**. 두 번째 답은 하는 일의 설명일 뿐 **왜 기다리는지**가 빠졌다. (Claude 가 준 힌트 `LocalToWorldSystem` 은 Entities 의 Job 이라 답이 아니었다 — 힌트가 잘못이었다) | `JobChaseSystem` 이 먼저 돌면 `ChaseJob` 은 예약만 되고 워커에서 아직 돌고 있다. 뒤에 도는 `RotationSystem` 이 같은 `LocalTransform` 에 메인 스레드에서 쓰려 하면 **동시에 쓰게 되어 값이 덮어써질 수 있다**(`LocalTransform` 은 위치·회전·스케일이 한 덩어리라 통째로 읽고 쓴다). 그래서 ECS 가 Job 이 끝날 때까지 메인 스레드를 세운다. **먼저 도는 쪽이 Job(비동기)일 때만** 기다림이 생기고, 순서가 반대면 기다림의 위치와 길이가 달라진다 (미측정) |
+| 5a | "컴포넌트 타입 단위로 처리" | 원리 ✅, 결과가 빠졌다 | `JobChaseSystem` 이 플레이어 **한 명**의 `LocalTransform` 을 읽을 뿐이어도, ECS 는 타입 단위로 추적하므로 `LocalTransform` 에 쓰는 지난 프레임의 `ChaseJob` 이 끝날 때까지 기다린다 (플레이어는 대상이 아닌데도). 이번 캡처에서는 `RotationSystem` 이 이미 기다려 준 뒤라 0.008 ms 로 짧았다 |
+| 5b | "값만 넘김" | 부분. 값을 Job 필드로 넘기는 건 이미 하고 있다. 핵심은 **어디서 읽어 오는가** | 위치를 별도 컴포넌트 `PlayerPosition`(다른 **타입**)에서 읽으면 `LocalTransform` 에 쓰는 Job 을 기다릴 필요가 없다 |
+| 6 | "한 워커가 처리하는 청크 개수는 정해져 있는데, count 100 이면 청크는 100÷16 ≈ 7개, 워커 둘이 절반씩" (먼저는 "Job 으로 만드는 시간이 더 걸릴 수도") | 방향 ✅ (예상). **계산 ✗**: 청크 수 = 엔티티 수 ÷ **청크 용량(64)** 이라 100 → **2청크**(64+36). 16 은 용량이 아니다. **"워커당 처리할 청크 수가 정해져 있다" ✗** — 남은 일을 계속 가져간다. **측정하지 않았다** | 2청크면 워커를 **최대 2개**만 쓸 수 있고, 15개가 있어도 소용없다. 거기에 `JobChaseSystem` 이 일이 없어도 메인 스레드에서 쓰는 고정 비용(0.008 ms)이 B 의 선형 추정(0.0006 ms, **측정 아님**)보다 크다 → Job 이 더 느릴 가능성이 크다. "항상 Job 이 좋다" 는 틀렸다 |
+| 7 | "여러 스레드에서 Random 값을 생성하게 된다?" → "한 프레임마다 struct 값이 바뀜" | **✗ 둘 다.** 앞의 것은 상황의 반복이고, 뒤의 것은 문제의 핵심이 아니다. 설명을 듣고 정리했고 **다시 자기 말로 답하는 것이 남아 있다** | `Random` 은 내부 상태를 가진 struct 이고 `NextFloat` 마다 상태가 바뀐다. Job 필드로 두면 병렬 워커들이 **같은 상태를 동시에 읽고 바꿔** 결과가 실행마다 달라지고(레이스) 재현이 안 된다. Job 은 매 프레임 새로 만들어지므로 상태가 이어지지도 않는다 |
+| SB | "SystemBase 로 하는 이유는 Keyboard 가 다른 매니지먼트에서 처리하기 때문?" | 방향 ✅, **용어 정정**: 매니지먼트가 아니라 **매니지드(managed)** 타입 | `Keyboard` 는 힙에 사는 클래스(참조 타입)라 Burst 가 다룰 수 없다. `ISystem` 은 Burst 로 컴파일되는 struct 라 못 쓰고, 클래스인 `SystemBase` 는 쓸 수 있지만 Burst 를 포기한다. 잃는 것은 이동 루프의 Burst 인데 플레이어는 1개라 영향이 거의 없다 |
+
+**과정에서 겪은 것**
+- 측정 중 그래프 값이 이상했던 건 **Clear 를 누르지 않아** 이전 기록이 남아 있어서였다. 방식을 바꿀 때마다 Clear 한다.
+- `ChaseJob` 이 안 보인 것은 **프레임을 잘못 골라서**였다. 예약한 프레임과 실행되는 프레임이 다를 수 있어 `JobChaseSystem` 은 한 칸 앞 프레임에 있을 수 있다.
+- 처음에 Timeline 에서 검색하라고 안내했다 — Timeline 에는 검색창이 없고 Hierarchy 보기에 있다 (Claude 의 안내 오류).
+- 스크린샷만으로는 어느 막대가 `ChaseJob` 인지 확정할 수 없어, 저장한 캡처를 프로그램으로 읽는 방법으로 바꿨다.
+
+**프로젝트 코드와 비교** — [EnemyChaseSystem.cs](../Assets/MyAssets/Scripts/Runtime/Enemy/EnemyChaseSystem.cs)
+
+| | 내 `JobChaseSystem` / `ChaseJob` | 프로젝트 `EnemyChaseSystem` / `ChaseJob` |
+|---|---|---|
+| 뼈대 | `[UpdateAfter]` → 값을 읽어 Job 필드에 담음 → `ScheduleParallel()` | **같다** |
+| Job 필드 | `float3 TargetPosition`, `float DeltaTime` | `float2 Target`, `float DeltaTime` 외 설정값 다수. 2D 라 `float2` |
+| 플레이어 위치 | `SystemAPI.GetComponent<LocalTransform>(player)` — **4번·5번에서 본 대기의 원인이 될 수 있다** | `GetSingleton<PlayerPosition>()` — 이동 직후 메인 스레드에서 갱신하는 **사본**. `LocalTransform` 에 쓰는 Job 을 기다리지 않는다 |
+| 순서 | `[UpdateAfter(typeof(StudyPlayerMoveSystem))]` | `[UpdateAfter(typeof(PlayerMoveSystem))]` + `[UpdateInGroup(typeof(GameplaySystemGroup))]` |
+| 의존성 | `Schedule*()` 가 `state.Dependency` 를 자동으로 연결 | 해시를 만드는 Job 이 컨테이너를 컴포넌트 안에 들고 있어 ECS 가 의존성을 모른다 → `JobHandle.CombineDependencies(state.Dependency, hash.BuildHandle)` 로 **직접** 건다. 다 쓴 뒤 `RegisterReader(handle)` |
+| `Random` | 안 씀 (7번 개념) | `Random.CreateFromIndex(math.hash(new uint2(Seed, (uint)self.Index)))` — 주석: "워커 간 Random 공유는 레이스라 엔티티마다 결정적으로 만든다". 매 프레임 `Seed` 를 바꿔 같은 수열이 반복되지 않게 한다 |
+| 필터 | `[WithAll(typeof(JobChaserTag))]` | `[WithAll(typeof(Active))]` — 풀에서 꺼진 적은 건너뜀 (5단계) |
+| 겹침 | 한 점에 겹침 | 공간 해시로 이웃을 찾아 서로 민다 (7단계) |
+
+**배운 것 / 다음에 다르게**
+- "Job 으로 바꿨다" 와 "빨라졌다" 사이에는 **누가 기다리는가** 가 있다. 같은 컴포넌트를 메인 스레드에서 쓰는 시스템이 바로 뒤에 있으면 병렬의 이득이 줄어든다. 측정하기 전에는 모른다.
+- 코어가 15개여도 2.5배였다. 병렬화의 효과는 코어 수가 아니라 **일의 크기, 시작 지연, 같은 시간대의 다른 Job** 에 좌우된다.
+- 측정은 조건을 먼저 적는다 (CPU, 코어 수, 안전 검사 상태). 이번에는 빠뜨렸다.
+- 스크린샷으로 읽기 어려운 값은 **캡처 파일을 프로그램으로 읽는** 편이 정확하다.
+
+---
+
+## 5단계 — 구조적 변경, ECB, Enableable 컴포넌트
+
+### 5.1 개념
+
+**구조적 변경 (다시)**
+1단계에서 "컴포넌트를 추가하거나 빼면 아키타입이 바뀌어 청크를 옮겨야 한다" 고 배웠다. 구조적 변경의 목록: `Instantiate`, `DestroyEntity`, `AddComponent`, `RemoveComponent`.
+4단계에서 본 것과 이어서 보면, 이것들은 **모든 컴포넌트의 배치를 바꾸므로** 돌고 있는 Job 이 있으면 먼저 끝내야 한다. 그 지점이 **동기화 지점(sync point)** 이다. `RotationSystem` 이 `ChaseJob` 을 기다린 것은 컴포넌트 하나 때문이었지만, 구조적 변경은 **전부**를 기다린다.
+
+**EntityCommandBuffer (ECB)**
+"나중에 해 줘" 목록이다. Job 안에서는 구조적 변경을 직접 할 수 없으니 ECB 에 **기록해 두고**, 정해진 시점에 메인 스레드에서 **한꺼번에 재생(playback)** 한다.
+
+```csharp
+var ecb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>()
+                   .CreateCommandBuffer(state.WorldUnmanaged);
+ecb.DestroyEntity(entity);        // 기록만 한다. 아직 아무 일도 안 일어난다
+```
+
+- 재생은 **`EndSimulationEntityCommandBufferSystem`** 이 프레임 끝에서 한다.
+- 병렬 Job 에서는 `ecb.AsParallelWriter()` 와 **`sortKey`** 를 쓴다 (7번 질문).
+- ECB 가 구조적 변경 **비용을 없애지는 않는다.** 재생 때 청크가 움직이는 건 그대로다. 미뤄서 한 번에 모을 뿐이다.
+
+**Enableable 컴포넌트**
+`IEnableableComponent` 를 구현한 컴포넌트는 **붙인 채로 켜고 끌 수 있다.** 청크 안의 **비트 하나**를 바꾸는 것이라 구조적 변경이 아니다. 청크 이동도, 아키타입 변경도, sync point 도 없다.
+
+```csharp
+public struct Alive : IComponentData, IEnableableComponent { }
+
+state.EntityManager.SetComponentEnabled<Alive>(entity, false);   // 메인 스레드
+// IJobEntity 안에서는: private void Execute(EnabledRefRW<Alive> alive, ...) { alive.ValueRW = false; }
+```
+
+- 꺼진 컴포넌트를 `WithAll<Alive>` 로 요구하는 쿼리는 그 엔티티를 **건너뛴다.** 꺼진 것을 찾으려면 `WithDisabled<Alive>` 를 쓴다.
+- 대가: 꺼진 엔티티도 **메모리를 차지하고**, 청크가 비트 마스크를 가진다.
+
+**렌더링 주의**
+Entities Graphics 는 우리가 만든 `Alive` 를 모른다. `Alive` 만 꺼도 큐브는 화면에 그대로 보인다. `MaterialMeshInfo` 도 `IEnableableComponent` 라서 **같이 꺼야** 사라진다. 프로젝트의 [Active.cs](../Assets/MyAssets/Scripts/Runtime/Pooling/Active.cs) 주석과 [PoolUtility.cs](../Assets/MyAssets/Scripts/Runtime/Pooling/PoolUtility.cs) 가 이 문제를 다룬다 (비교는 과제가 끝난 뒤에 열어 본다).
+
+**풀링**
+처음에 필요한 만큼 **미리 만들어 두고**(2단계 `SpawnSystem` 이 하던 것이다), "죽음" 은 끄는 것, "태어남" 은 켜고 값을 다시 쓰는 것으로 처리한다. `Destroy`/`Instantiate` 를 반복하지 않는다.
+
+### 5.2 과제
+
+**목표**: 같은 상황 — 큐브 N개가 수명(초)을 갖고 죽었다가 다시 태어난다 — 을 **(A) 생성·삭제** 와 **(B) 풀링(Enableable)** 두 방식으로 만들고, Profiler 로 비교해 표로 남긴다.
+
+**파일 구조는 직접 설계한다.** 이번에는 파일 이름을 정해 주지 않는다. 필요한 것은 아래 요구를 만족하는 최소한의 컴포넌트와 시스템이다.
+
+**조건**
+- (A) 수명이 끝난 엔티티를 **ECB 로 `DestroyEntity`** 하고, 같은 수만큼 **ECB 로 `Instantiate`** 한다. 2단계 스포너의 프리팹 방식을 재사용해도 된다
+- (B) `IEnableableComponent` 를 **직접 만들어** 꺼서 죽이고 켜서 되살린다. 시스템은 **`IJobEntity` + Burst** 로 쓴다. 죽을 때 **화면에서도 사라져야 한다** (`MaterialMeshInfo` 도 같이 끈다 — "안 보이는데 살아 있는 엔티티" 금지)
+- 두 방식은 **같은 Count, 같은 수명 분포**로 비교한다. 매 프레임 죽고 태어나는 수가 비슷해야 공정하다
+- 1·2·3·4단계 파일은 수정하지 않는다. 스포너와 `StudyCube` 프리팹은 재사용 가능
+- 숫자를 시스템 안에 박지 않는다 (Authoring 인스펙터 값으로)
+
+**API 힌트** (이름만 줌. 쓰는 법은 직접 찾아보기)
+- `EndSimulationEntityCommandBufferSystem.Singleton`, `CreateCommandBuffer(state.WorldUnmanaged)`
+- `ecb.DestroyEntity`, `ecb.Instantiate`, `ecb.SetComponent`
+- `IEnableableComponent`, `EnabledRefRW<T>`, `state.EntityManager.SetComponentEnabled<T>`
+- `[WithDisabled(typeof(T))]`, `[WithAll(typeof(T))]`
+
+**씬 작업**
+1. `Step05A.unity` (+ SubScene) 와 `Step05B.unity` (+ SubScene). 방식마다 씬을 따로 둔다 (한 씬에 두 시스템이 함께 돌면 비교가 안 된다)
+2. 같은 큐브 프리팹, 같은 Count 를 쓰되 **수명 컴포넌트가 다른 방식**을 붙인다
+3. Play 해서 큐브가 계속 사라졌다 나타나는지 먼저 눈으로 확인한다
+
+**측정**
+- 재는 값: ① 이 방식을 처리하는 시스템들의 메인 스레드 ms (A 는 `EndSimulationEntityCommandBufferSystem` 재생 포함), ② Timeline 에서 `JobHandle.Complete` / `WaitForJobGroupID` 같은 **대기가 어디에 얼마나** 생기는가, ③ **Window → Search → Archetypes** 에서 A 와 B 의 아키타입·청크 수
+- 측정 전에 **CPU 모델·코어 수, Jobs 메뉴 상태**를 먼저 적는다 (4단계에서 빠뜨렸다). Profiler 는 방식마다 **Clear**, Play 후 10초 뒤, 뒤쪽 프레임에서 읽는다
+
+**확인 질문**
+1. A 에서 ECB 재생은 Timeline 의 어느 줄에 나타나고 몇 ms 인가? 그 줄에서 구조적 변경 비용이 보이는가?
+2. A 와 B 의 청크 수와 아키타입 수를 비교하라. 예상한 뒤 확인한다
+3. B 에서 `Alive` 만 끄고 `MaterialMeshInfo` 를 안 끄면 화면에 무슨 일이 생기는가? (해 보기)
+4. B 의 켜고 끄기는 Job 안에서 되는데 A 의 `DestroyEntity` 는 Job 안에서 직접 못 한다. 왜인가? (4단계의 "기다림" 과 연결)
+5. 꺼진 엔티티에도 비용이 있는가? 풀을 필요보다 훨씬 크게 잡으면 어떤 비용이 드는가?
+6. `WithAll<Alive>` 쿼리는 꺼진 엔티티를 어떻게 다루는가? 꺼진 엔티티를 **찾아서** 되살리려면 어떻게 하는가?
+7. ECB 를 `AsParallelWriter` 로 쓸 때 `sortKey` 는 왜 필요한가? (답만 생각해 보기)
+
+### 5.3 결과 / 배운 것
+
+> 과제를 마치면 여기에 적는다. **측정 표를 반드시 포함한다** (방식 / ms / Count / CPU / Jobs 메뉴 상태).
