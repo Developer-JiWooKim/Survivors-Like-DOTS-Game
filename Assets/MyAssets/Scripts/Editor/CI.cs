@@ -42,8 +42,8 @@ namespace SurvivorsLikeDOTS.Editor
         /// </summary>
         public static void BuildPlayers()
         {
-            bool ok = Build("Builds/Release/Survivors.exe", BuildOptions.None)
-                      && Build("Builds/Development/Survivors.exe", BuildOptions.Development);
+            bool ok = Build("Builds/Release/SurvivorsLikeDOTS.exe", BuildOptions.None)
+                      && Build("Builds/Development/SurvivorsLikeDOTS.exe", BuildOptions.Development);
             EditorApplication.Exit(ok ? 0 : 1);
         }
 

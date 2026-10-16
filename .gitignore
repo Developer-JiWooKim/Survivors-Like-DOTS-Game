@@ -73,3 +73,9 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Asset Store 에셋 — 라이선스상 공개 저장소에 재배포할 수 없다.
+# 로컬에서 Package Manager > My Assets 로 임포트한다. 패키지 안에 .meta 가 들어 있어 GUID 가 같게 복원되므로
+# 우리 씬·프리팹의 참조는 다시 임포트하면 살아난다.
+/[Aa]ssets/HiRezSpaceshipsCreatorFree/
+/[Aa]ssets/HiRezSpaceshipsCreatorFree.meta

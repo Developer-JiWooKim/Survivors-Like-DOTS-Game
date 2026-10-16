@@ -82,7 +82,7 @@
   <Project Path="Unity.Core.Editor.csproj" />
   <Project Path="UniTask.Editor.csproj" />
   <Project Path="Unity.Mathematics.Extensions.csproj" />
-  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="SurvivorsLikeDOTS.csproj" />
   <Project Path="Unity.Entities.Graphics.Editor.csproj" />
   <Project Path="Unity.Transforms.Hybrid.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.RenderPipelines.Core.Editor.csproj" />
@@ -100,7 +100,7 @@
   <Project Path="Unity.Collections.Tests.CoreCLR.ProtectedJobNested.csproj" />
   <Project Path="UniTask.Addressables.csproj" />
   <Project Path="Unity.Burst.csproj" />
-  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="SurvivorsLikeDOTS.Editor.csproj" />
   <Project Path="Unity.Rendering.LightTransport.Editor.csproj" />
   <Project Path="Unity.Collections.Editor.csproj" />
   <Project Path="UniTask.DOTween.csproj" />
@@ -147,7 +147,7 @@
   <Project Path="Unity.RenderPipeline.Universal.ShaderLibrary.Player.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.ObjectDispatcher.Runtime.Player.csproj" />
   <Project Path="Unity.Mathematics.Extensions.Player.csproj" />
-  <Project Path="Assembly-CSharp.Player.csproj" />
+  <Project Path="SurvivorsLikeDOTS.Player.csproj" />
   <Project Path="Unity.Transforms.Hybrid.Player.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.004.Player.csproj" />
   <Project Path="Unity.Collections.Tests.CoreCLR.PublicJobPrivateGeneric.Player.csproj" />
