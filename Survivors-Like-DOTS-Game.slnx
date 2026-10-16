@@ -71,6 +71,7 @@
   <Project Path="Unity.ShaderGraph.Utilities.csproj" />
   <Project Path="Unity.VisualScripting.Shared.Editor.csproj" />
   <Project Path="Unity.Profiling.Core.csproj" />
+  <Project Path="SurvivorsLikeDOTS.Editor.csproj" />
   <Project Path="Unity.SurfaceCache.Runtime.csproj" />
   <Project Path="Unity.InternalAPIEngineBridge.RenderPipelines.Core.Runtime.Shared.csproj" />
   <Project Path="Unity.InputSystem.ForUI.Editor.csproj" />
@@ -100,7 +101,6 @@
   <Project Path="Unity.Collections.Tests.CoreCLR.ProtectedJobNested.csproj" />
   <Project Path="UniTask.Addressables.csproj" />
   <Project Path="Unity.Burst.csproj" />
-  <Project Path="SurvivorsLikeDOTS.Editor.csproj" />
   <Project Path="Unity.Rendering.LightTransport.Editor.csproj" />
   <Project Path="Unity.Collections.Editor.csproj" />
   <Project Path="UniTask.DOTween.csproj" />

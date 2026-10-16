@@ -11,6 +11,7 @@ Unity 6 DOTS 기반 **3D 우주 슈터 + 서바이버 라이크**. 이전 2D 프
 | 렌더 | URP 17.6 / Universal Renderer (Forward+) — `Assets/Settings/PC_Renderer.asset` |
 | 핵심 스택 | Entities 6.6.0 / Entities.Graphics 6.6.0 / Collections 6.6.0 / Burst (Entities 의존성) |
 | 기타 | Input System 1.20.1, UniTask (비동기 — 매니지드 쪽 전용), `com.unity.pipeline` 0.8.0-exp.1 (CLI 연결) |
+| 빌드 | Windows x64 · **IL2CPP** (2026-10-16 결정 — 출시 백엔드로 측정). 필요: Unity IL2CPP 모듈 + VS C++ 컴파일러 + Windows SDK 10.0.19041+ |
 | 스크립트 루트 | `Assets/MyAssets/Scripts/` |
 
 **정해진 게임 방향 (2026-10-16)**
@@ -251,7 +252,7 @@ grep -a "Exception:" "$L" | cut -c1-200 | sort | uniq -c | sort -rn | head   # �
 
 | 함정 | 대응 |
 |---|---|
-| URP **SSAO** 의 DepthNormal 프리패스가 지오메트리를 2배 제출 | 쓰지 않을 렌더러 기능은 **끄지 말고 제거** — 끄기만 하면 빌드에서 리소스가 스트리핑돼 검은 화면. 현재 `PC_Renderer` 에 SSAO 가 있다 → 첫 빌드 전에 처리 |
+| URP **SSAO** 의 DepthNormal 프리패스가 지오메트리를 2배 제출 | 쓰지 않을 렌더러 기능은 **끄지 말고 제거** — 끄기만 하면 빌드에서 리소스가 스트리핑돼 검은 화면. `PC_Renderer` 의 SSAO 는 2026-10-16 제거함 (`Editor/RendererSetup.cs`) |
 | 잡 완료 전에 메인 스레드가 컴포넌트를 읽어 예외 대량 발생 | 의존성 / `Complete` 지점을 명확히 |
 | UI(managed)에서 `SetSingleton` → "access is not read-write" | 쓰기 접근 경로를 따로 둔다 |
 | 공간 해시 키 충돌로 여러 칸 조회 시 같은 대상 중복 집계 | 조회 정확성은 **전수 비교 테스트** |

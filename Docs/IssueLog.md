@@ -27,10 +27,64 @@ Unity 6 DOTS 3D 우주 슈터 — **발생한 이슈와 대응** 기록.
 | ID | 발생일 | 작업 단위 | 분류 | 제목 | 상태 | 해결일 |
 |---|---|---|---|---|---|---|
 | [001](#issue-001) | 2026-10-16 | WU-00 | 툴링 | `unity-recompile.sh` 가 pipeline 0.8.0 응답을 못 읽음 — 성공도 exit 3, 컴파일 에러도 exit 3 | ✅ 해결 | 2026-10-16 |
+| [002](#issue-002) | 2026-10-16 | WU-00 | 빌드 | 첫 플레이어 빌드 실패 — IL2CPP 모듈 미설치, 설치 후에는 Windows SDK 미설치 | ✅ 해결 | 2026-10-16 |
 
 ---
 
 ## 상세
+
+### ISSUE-002
+
+| | |
+|---|---|
+| **발생일시** | 2026-10-16 |
+| **작업 단위** | WU-00 (기반 세팅 — 첫 빌드) |
+| **분류** | 빌드 |
+| **상태** | ✅ 해결 |
+| **해결일** | 2026-10-16 |
+| **관련 작업** | [WorkLog 2026-10-16](WorkLog.md) |
+
+**증상**
+
+`-executeMethod SurvivorsLikeDOTS.Editor.CI.BuildPlayers` 가 exit 1, 4 초 만에 실패 (`Logs/cli-build.log`).
+
+```
+Error building Player: Currently selected scripting backend (IL2CPP) is not installed.
+[CI] 빌드 Builds/Release/SurvivorsLikeDOTS.exe (None) — Failed, 에러 1, 경고 1, 4 초
+```
+
+**재현 조건**
+
+항상. `ProjectSettings.asset` 의 `scriptingBackend: Standalone: 1` (= IL2CPP, 프로젝트 템플릿 기본값).
+설치된 Windows 플레이어 변형은 `win64_player_*_mono` 뿐이다 (`Editor/Data/PlaybackEngines/windowsstandalonesupport/Variations`).
+
+**원인**
+
+템플릿이 IL2CPP 를 기본으로 골라 두었고, 이 PC 의 Unity 6000.6.5f1 에는 Windows IL2CPP 모듈이 설치되지 않았다.
+이전 프로젝트에서 IL2CPP 재측정을 못 한 것과 같은 원인 (모듈 미설치).
+
+**시도한 것**
+
+| 시도 | 결과 |
+|---|---|
+| 백엔드 선택지 제시 (A IL2CPP 모듈 설치 / B Mono 로 변경) → 사용자 A 선택, Hub 에서 "Windows Build Support (IL2CPP)" 설치 | 모듈 설치 확인 (`Variations/win64_player_*_il2cpp`) |
+| 다시 빌드 | ❌ 72 초 후 실패: `error: Could not set up a toolchain for Architecture x64.` 상세: **`Windows SDK (version 10.0.19041.0 or newer) is not installed.`** VS 2022·2026 의 C++ 컴파일러는 감지됐다 (vswhere). 레지스트리 `HKLM\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0` 없음, `Windows Kits\10\Include` 폴더 없음 |
+| 사용자가 Windows SDK 설치 (10.0.22621.0, 10.0.26100.0 — 레지스트리 `ProductVersion 10.0.26100` 확인) 후 다시 빌드 | ✅ Release 247 초 · Development 254 초, 에러 0 |
+
+**해결**
+
+IL2CPP 를 유지한다 (사용자 선택 A). 필요한 것 세 가지를 모두 갖췄다:
+1. Unity 모듈 "Windows Build Support (IL2CPP)"
+2. C++ 컴파일러 — VS 2022 / 2026 Community (이미 있었음)
+3. **Windows SDK 10.0.19041 이상** — 빠져 있었음
+
+**재발 방지**
+
+- 새 PC 에서 세팅할 때는 위 세 가지를 같이 확인한다. 툴체인 요구사항은 에러 메시지 목록 전체를 본다.
+- 첫 IL2CPP 빌드는 4 분대 (C++ 컴파일). `Builds/*/SurvivorsLikeDOTS_BackUpThisFolder_ButDontShipItWithYourGame` (약 1.4GB, 디버그 심볼) 은 배포에서 뺀다. `Builds/` 는 gitignore 대상.
+
+> Claude 의 판단 실수: 처음 선택지를 낼 때 vswhere 로 VC Tools 만 확인하고 "C++ 도구는 이미 있다" 고 말했다. IL2CPP 는 **컴파일러 + Windows SDK** 둘 다 필요하다. 툴체인 요구사항은 에러 메시지의 목록 전체를 확인한다.
+
 
 ### ISSUE-001
 
