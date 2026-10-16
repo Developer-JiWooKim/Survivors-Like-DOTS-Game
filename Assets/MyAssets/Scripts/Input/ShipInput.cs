@@ -10,8 +10,6 @@ namespace SurvivorsLikeDOTS.Input
     /// Input System 은 매니지드 API 라 Burst 잡 안에서 직접 읽을 수 없다.
     /// <see cref="ShipInputSystem"/> 이 매니지드 영역에서 한 번 읽어 여기에 써 두면,
     /// 이후 시스템은 전부 Burst 로 컴파일된 채 이 값을 읽는다. 매니지드 경계를 이 한 곳으로 몬다.
-    ///
-    /// 이름이 PlayerInput 이 아닌 이유: Input System 의 <c>UnityEngine.InputSystem.PlayerInput</c> 과 겹친다.
     /// </summary>
     public struct ShipInput : IComponentData
     {

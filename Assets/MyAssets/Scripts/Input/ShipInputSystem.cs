@@ -31,7 +31,6 @@ namespace SurvivorsLikeDOTS.Input
 
         protected override void OnCreate()
         {
-            // 다른 시스템이 첫 프레임부터 안전하게 조회하도록 미리 만들어 둔다.
             EntityManager.CreateSingleton<ShipInput>();
         }
 
